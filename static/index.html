@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>네이버 지도 주소 변환기</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
+  .container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+  h1 { font-size: 1.6rem; margin-bottom: 24px; color: #03c75a; }
+  .card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 16px; color: #555; }
+
+  .upload-zone { border: 2px dashed #ccc; border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; transition: border-color .2s; }
+  .upload-zone.dragover { border-color: #03c75a; background: #f0fff6; }
+  .upload-zone p { color: #999; margin-top: 8px; font-size: .9rem; }
+  #fileInput { display: none; }
+
+  textarea { width: 100%; height: 120px; border: 1px solid #ddd; border-radius: 8px; padding: 12px; font-size: .9rem; resize: vertical; }
+  .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: .9rem; font-weight: 600; }
+  .btn-primary { background: #03c75a; color: #fff; }
+  .btn-primary:hover { background: #02a84a; }
+  .btn-secondary { background: #eee; color: #555; margin-left: 8px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  #addressList { list-style: none; }
+  #addressList li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+  #addressList li:last-child { border-bottom: none; }
+  .badge { padding: 3px 8px; border-radius: 12px; font-size: .75rem; font-weight: 600; white-space: nowrap; }
+  .badge-pending { background: #e8f4fd; color: #0072c3; }
+  .badge-success { background: #e8f9ef; color: #1a7a3c; }
+  .badge-failed { background: #fde8e8; color: #b91c1c; }
+  .badge-ambiguous { background: #fff3e0; color: #b45309; }
+  .badge-unrecognized { background: #f3f4f6; color: #6b7280; }
+  .addr-text { flex: 1; font-size: .9rem; padding: 4px 8px; border: 1px solid transparent; border-radius: 4px; }
+  .addr-text:focus { border-color: #03c75a; outline: none; }
+  .source { font-size: .75rem; color: #999; white-space: nowrap; }
+
+  .progress-bar-wrap { background: #eee; border-radius: 8px; height: 8px; margin: 12px 0; overflow: hidden; }
+  .progress-bar { height: 100%; background: #03c75a; width: 0%; transition: width .3s; }
+  #statusMsg { font-size: .9rem; color: #555; margin-top: 8px; }
+  #summary { margin-top: 12px; font-size: .9rem; }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>네이버 지도 주소 변환기</h1>
+
+  <div class="card">
+    <h2>파일 업로드</h2>
+    <div class="upload-zone" id="uploadZone">
+      <svg width="40" height="40" fill="none" stroke="#ccc" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p>PDF, Excel(.xlsx/.xls), CSV 파일을 드래그하거나 클릭하여 선택</p>
+      <input type="file" id="fileInput" accept=".pdf,.xlsx,.xls,.csv">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>텍스트 직접 입력</h2>
+    <textarea id="textInput" placeholder="주소를 붙여넣거나 직접 입력하세요...&#10;서울특별시 강남구 테헤란로 152&#10;경기도 수원시 팔달구 효원로 1"></textarea>
+    <div style="margin-top:12px">
+      <button class="btn btn-primary" onclick="parseText()">주소 추출</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="addressCard">
+    <h2>추출된 주소 목록 <span id="addressCount" style="color:#999;font-weight:400"></span></h2>
+    <ul id="addressList"></ul>
+    <div style="margin-top:16px">
+      <button class="btn btn-primary" id="saveBtn" onclick="startSave()">저장 시작</button>
+      <button class="btn btn-secondary" id="retryBtn" onclick="startRetry()" style="display:none">실패 항목 재시도</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="progressCard">
+    <h2>저장 진행 상황</h2>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+    <div id="statusMsg">준비 중...</div>
+    <div id="summary"></div>
+  </div>
+</div>
+
+<script>
+  let addresses = [];
+  let total = 0;
+  let done = 0;
+  let eventSource = null;
+
+  const uploadZone = document.getElementById('uploadZone');
+  const fileInput = document.getElementById('fileInput');
+
+  uploadZone.addEventListener('click', () => fileInput.click());
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) uploadFile(fileInput.files[0]); });
+
+  async function uploadFile(file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch('/upload', { method: 'POST', body: fd });
+      if (!res.ok) { alert('업로드 실패: ' + (await res.json()).detail); return; }
+      const data = await res.json();
+      setAddresses(data.addresses);
+    } catch (e) { alert('오류: ' + e.message); }
+  }
+
+  async function parseText() {
+    const text = document.getElementById('textInput').value.trim();
+    if (!text) return;
+    const res = await fetch('/parse-text', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({text}) });
+    const data = await res.json();
+    setAddresses(data.addresses);
+  }
+
+  function setAddresses(items) {
+    addresses = items;
+    total = items.length;
+    done = 0;
+    renderList();
+    document.getElementById('addressCard').classList.remove('hidden');
+    document.getElementById('retryBtn').style.display = 'none';
+    document.getElementById('progressCard').classList.add('hidden');
+    document.getElementById('summary').innerHTML = '';
+  }
+
+  function renderList() {
+    const list = document.getElementById('addressList');
+    list.innerHTML = '';
+    document.getElementById('addressCount').textContent = `(${addresses.length}개)`;
+    addresses.forEach(item => {
+      const li = document.createElement('li');
+      li.id = 'item-' + item.id;
+      li.innerHTML = `
+        <span class="badge badge-${item.status}">${statusLabel(item.status)}</span>
+        <input class="addr-text" value="${esc(item.display_text)}" data-id="${item.id}" onchange="updateText(this)">
+        <span class="source">${esc(item.source_location)}</span>
+      `;
+      list.appendChild(li);
+    });
+  }
+
+  function statusLabel(s) {
+    return {pending:'대기',success:'성공',failed:'실패',ambiguous:'모호',unrecognized:'미인식'}[s] || s;
+  }
+
+  function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+  function updateText(input) {
+    const item = addresses.find(a => a.id === input.dataset.id);
+    if (item) item.display_text = input.value;
+  }
+
+  function updateItemStatus(id, status) {
+    const item = addresses.find(a => a.id === id);
+    if (item) item.status = status;
+    const li = document.getElementById('item-' + id);
+    if (li) {
+      const badge = li.querySelector('.badge');
+      badge.className = `badge badge-${status}`;
+      badge.textContent = statusLabel(status);
+    }
+  }
+
+  async function startSave() {
+    const payload = addresses.filter(a => a.status !== 'success').map(a => ({id: a.id, display_text: a.display_text}));
+    if (!payload.length) { alert('저장할 항목이 없습니다'); return; }
+
+    document.getElementById('saveBtn').disabled = true;
+    document.getElementById('progressCard').classList.remove('hidden');
+    done = 0;
+    total = payload.length;
+    updateProgress(0, '저장 시작 중...');
+
+    const res = await fetch('/save', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({addresses: payload}) });
+    if (!res.ok) {
+      const err = await res.json();
+      alert('오류: ' + (err.detail || JSON.stringify(err)));
+      document.getElementById('saveBtn').disabled = false;
+      return;
+    }
+
+    listenProgress();
+  }
+
+  async function startRetry() {
+    const failedIds = addresses.filter(a => a.status === 'failed').map(a => a.id);
+    if (!failedIds.length) { alert('재시도할 항목이 없습니다'); return; }
+
+    document.getElementById('retryBtn').disabled = true;
+    done = 0;
+    total = failedIds.length;
+
+    const res = await fetch('/retry', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ids: failedIds}) });
+    if (!res.ok) { alert('오류'); document.getElementById('retryBtn').disabled = false; return; }
+
+    listenProgress();
+  }
+
+  function listenProgress() {
+    if (eventSource) eventSource.close();
+    eventSource = new EventSource('/progress');
+    eventSource.onmessage = e => {
+      const data = JSON.parse(e.data);
+
+      if (data.type === 'waiting_for_login') {
+        updateProgress(0, '네이버 로그인 창에서 로그인 후 기다려 주세요...');
+        return;
+      }
+
+      if (data.type === 'done') {
+        eventSource.close();
+        const s = data.summary || {};
+        const errMsg = data.error ? `오류: ${data.error}` : '';
+        document.getElementById('summary').innerHTML = errMsg ||
+          `완료 — 성공 ${s.success||0}개 / 실패 ${s.failed||0}개 / 모호 ${s.ambiguous||0}개`;
+        updateProgress(100, '완료');
+        document.getElementById('saveBtn').disabled = false;
+        const hasFailures = (s.failed||0) > 0;
+        document.getElementById('retryBtn').style.display = hasFailures ? 'inline-block' : 'none';
+        document.getElementById('retryBtn').disabled = false;
+        return;
+      }
+
+      if (data.id) {
+        done++;
+        updateItemStatus(data.id, data.status);
+        updateProgress(Math.round(done / total * 100), `저장 중... (${done}/${total})`);
+      }
+    };
+    eventSource.onerror = () => {
+      updateProgress(0, '연결 오류 — 페이지를 새로고침하세요');
+      eventSource.close();
+    };
+  }
+
+  function updateProgress(pct, msg) {
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('statusMsg').textContent = msg;
+  }
+</script>
+</body>
+</html>
