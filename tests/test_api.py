@@ -51,3 +51,23 @@ def test_login_status_반환():
     response = client.get("/login-status")
     assert response.status_code == 200
     assert "logged_in" in response.json()
+
+def test_retry_422_잘못된_id():
+    response = client.post("/retry", json={"ids": ["nonexistent-id-12345"]})
+    assert response.status_code == 422
+
+def test_retry_422_ambiguous_id():
+    # Set up an ambiguous item in the registry
+    from models import AddressItem
+    import main
+    item = AddressItem(
+        raw_text="test",
+        display_text="test",
+        source_location="test",
+        status="ambiguous"
+    )
+    main._item_registry[item.id] = item
+    response = client.post("/retry", json={"ids": [item.id]})
+    assert response.status_code == 422
+    # Clean up
+    del main._item_registry[item.id]
