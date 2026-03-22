@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
-COOKIES_PATH = Path("sessions/naver_cookies.json")
+COOKIES_PATH = Path(__file__).parent.parent / "sessions" / "naver_cookies.json"
 NAVER_MAIN = "https://www.naver.com"
 LOGIN_COOKIE = "NID_AUT"
 POLL_INTERVAL = 2  # seconds
@@ -28,8 +28,12 @@ class NaverBrowser:
         self._page = await self._context.new_page()
 
         if COOKIES_PATH.exists():
-            cookies = json.loads(COOKIES_PATH.read_text())
-            await self._context.add_cookies(cookies)
+            try:
+                cookies = json.loads(COOKIES_PATH.read_text())
+                await self._context.add_cookies(cookies)
+            except Exception as e:
+                import sys
+                print(f"[browser] Warning: could not load session cookies: {e}", file=sys.stderr)
 
         self._started = True
 
@@ -38,9 +42,8 @@ class NaverBrowser:
         return self._page
 
     async def is_logged_in(self) -> bool:
-        """Check login state by looking for NID_AUT cookie."""
+        """Check login state by looking for NID_AUT cookie (no page navigation)."""
         await self.start()
-        await self._page.goto(NAVER_MAIN)
         cookies = await self._context.cookies()
         return any(c["name"] == LOGIN_COOKIE for c in cookies)
 

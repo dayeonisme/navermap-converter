@@ -63,6 +63,7 @@ async def upload_file(file: UploadFile = File(...)):
     finally:
         tmp_path.unlink(missing_ok=True)
 
+    _item_registry.clear()
     _item_registry.update({i.id: i for i in items})
     return {"addresses": [i.to_dict() for i in items]}
 
@@ -73,7 +74,10 @@ class ParseTextRequest(BaseModel):
 
 @app.post("/parse-text")
 async def parse_text(req: ParseTextRequest):
+    if len(req.text) > 1_000_000:  # 1MB text limit
+        raise HTTPException(status_code=422, detail="텍스트가 너무 깁니다 (최대 1MB)")
     items = extract_addresses(req.text, source_prefix="붙여넣기")
+    _item_registry.clear()
     _item_registry.update({i.id: i for i in items})
     return {"addresses": [i.to_dict() for i in items]}
 
@@ -97,9 +101,10 @@ class RetryRequest(BaseModel):
 
 @app.post("/save", status_code=202)
 async def save_addresses(req: SaveRequest):
-    global _job_active
+    global _job_active, _progress_queue
     if _job_active:
         raise HTTPException(status_code=409, detail="이미 저장 작업이 진행 중입니다")
+    _progress_queue = asyncio.Queue()
     _job_active = True  # Set synchronously before create_task to prevent race
     asyncio.create_task(_run_save(req.addresses))
     return {"status": "accepted"}
@@ -107,7 +112,7 @@ async def save_addresses(req: SaveRequest):
 
 @app.post("/retry", status_code=202)
 async def retry_addresses(req: RetryRequest):
-    global _job_active
+    global _job_active, _progress_queue
     if _job_active:
         raise HTTPException(status_code=409, detail="이미 저장 작업이 진행 중입니다")
 
@@ -123,6 +128,7 @@ async def retry_addresses(req: RetryRequest):
     if rejected:
         raise HTTPException(status_code=422, detail={"rejected_ids": rejected})
 
+    _progress_queue = asyncio.Queue()
     _job_active = True
     asyncio.create_task(_run_save(items))
     return {"status": "accepted"}
@@ -142,6 +148,8 @@ async def _empty_stream() -> AsyncGenerator[str, None]:
 
 async def _stream_progress() -> AsyncGenerator[str, None]:
     global _progress_queue
+    if _progress_queue is None:
+        return
     while True:
         event = await _progress_queue.get()
         yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
@@ -150,8 +158,7 @@ async def _stream_progress() -> AsyncGenerator[str, None]:
 
 
 async def _run_save(address_dicts: list[dict]):
-    global _job_active, _progress_queue
-    _progress_queue = asyncio.Queue()
+    global _job_active
 
     try:
         from datetime import date
@@ -186,7 +193,7 @@ async def _run_save(address_dicts: list[dict]):
 
 @app.get("/")
 async def index():
-    html_path = Path("static/index.html")
+    html_path = Path(__file__).parent / "static" / "index.html"
     if not html_path.exists():
         return HTMLResponse("<h1>UI not yet built</h1>")
     return HTMLResponse(html_path.read_text(encoding="utf-8"))

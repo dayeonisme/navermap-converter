@@ -48,7 +48,11 @@ def test_parse_text_각_항목_필드():
     assert "status" in item
 
 def test_login_status_반환():
-    response = client.get("/login-status")
+    from unittest.mock import AsyncMock, patch
+    mock_browser = AsyncMock()
+    mock_browser.is_logged_in = AsyncMock(return_value=False)
+    with patch('main.get_browser', return_value=mock_browser):
+        response = client.get("/login-status")
     assert response.status_code == 200
     assert "logged_in" in response.json()
 

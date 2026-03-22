@@ -19,7 +19,7 @@ async def test_is_logged_in_true_when_NID_AUT_쿠키_존재():
 
     result = await browser.is_logged_in()
     assert result is True
-    mock_page.goto.assert_called_once()
+    mock_page.goto.assert_not_called()
 
 @pytest.mark.asyncio
 async def test_is_logged_in_false_when_NID_AUT_쿠키_없음():

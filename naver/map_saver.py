@@ -68,7 +68,10 @@ async def _save_one(page, address: str, list_name: str) -> str:
                 return "success"
 
         return "failed"
-    except Exception:
+    except Exception as e:
+        # Log error type so users know if it's a selector issue vs. address not found
+        import sys
+        print(f"[map_saver] Error saving '{address}': {type(e).__name__}: {e}", file=sys.stderr)
         return "failed"
 
 
