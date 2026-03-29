@@ -1,6 +1,9 @@
 # naver/browser.py
+from __future__ import annotations
+
 import asyncio
 import json
+import sys
 from pathlib import Path
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
@@ -32,7 +35,6 @@ class NaverBrowser:
                 cookies = json.loads(COOKIES_PATH.read_text())
                 await self._context.add_cookies(cookies)
             except Exception as e:
-                import sys
                 print(f"[browser] Warning: could not load session cookies: {e}", file=sys.stderr)
 
         self._started = True
@@ -46,6 +48,25 @@ class NaverBrowser:
         await self.start()
         cookies = await self._context.cookies()
         return any(c["name"] == LOGIN_COOKIE for c in cookies)
+
+    async def try_import_chrome_session(self) -> bool:
+        """Chrome에서 Naver 쿠키를 읽어 세션에 추가. NID_AUT가 있으면 True 반환."""
+        try:
+            from naver.chrome_cookies import get_naver_cookies_from_chrome
+            chrome_cookies = get_naver_cookies_from_chrome()
+            if not chrome_cookies:
+                return False
+            has_auth = any(c["name"] == LOGIN_COOKIE for c in chrome_cookies)
+            if not has_auth:
+                return False
+            await self.start()
+            await self._context.add_cookies(chrome_cookies)
+            await self._save_cookies()
+            print("[browser] Chrome 세션 쿠키 임포트 완료", file=sys.stderr)
+            return True
+        except Exception as e:
+            print(f"[browser] Chrome 쿠키 임포트 실패: {e}", file=sys.stderr)
+            return False
 
     async def wait_for_login(self, timeout: int = 120) -> bool:
         """Wait for user to manually log in by polling NID_AUT cookie."""

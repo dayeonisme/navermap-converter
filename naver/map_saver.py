@@ -127,11 +127,14 @@ async def save_one_by_index(page, address: str, list_name: str, index: int) -> s
 async def save_addresses_to_naver(
     browser: NaverBrowser,
     list_name: str,
-    addresses: list[dict],
+    addresses: list,
     item_registry: Dict[str, AddressItem],
     queue: asyncio.Queue,
+    is_cancelled=None,
 ) -> None:
-    """Create list then save addresses sequentially. Streams progress via queue."""
+    """Create list then save addresses sequentially. Streams progress via queue.
+    is_cancelled: optional callable returning bool — checked between each item.
+    """
     page = await browser.get_page()
 
     # Create list first — raises RuntimeError if it fails (stops entire batch)
@@ -140,6 +143,10 @@ async def save_addresses_to_naver(
     summary = {"success": 0, "failed": 0, "ambiguous": 0}
 
     for addr_dict in addresses:
+        if is_cancelled and is_cancelled():
+            await queue.put({"type": "cancelled"})
+            return
+
         id_ = addr_dict["id"]
         display_text = addr_dict["display_text"]
 

@@ -25,6 +25,7 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 # Singleton state
 # _job_active: bool flag to prevent concurrent save jobs (using Lock.locked() has TOCTOU race)
 _job_active: bool = False
+_job_cancelled: bool = False
 _browser: NaverBrowser | None = None
 _progress_queue: asyncio.Queue | None = None
 _item_registry: dict[str, AddressItem] = {}  # id -> AddressItem
@@ -102,13 +103,23 @@ class RetryRequest(BaseModel):
 
 @app.post("/save", status_code=202)
 async def save_addresses(req: SaveRequest):
-    global _job_active, _progress_queue
+    global _job_active, _job_cancelled, _progress_queue
     if _job_active:
         raise HTTPException(status_code=409, detail="이미 저장 작업이 진행 중입니다")
     _progress_queue = asyncio.Queue()
+    _job_cancelled = False
     _job_active = True  # Set synchronously before create_task to prevent race
     asyncio.create_task(_run_save(req.addresses))
     return {"status": "accepted"}
+
+
+@app.post("/cancel")
+async def cancel_job():
+    global _job_cancelled
+    if not _job_active:
+        raise HTTPException(status_code=404, detail="진행 중인 작업이 없습니다")
+    _job_cancelled = True
+    return {"status": "cancelling"}
 
 
 class ResolveRequest(BaseModel):
@@ -188,8 +199,8 @@ async def _stream_progress() -> AsyncGenerator[str, None]:
             break
 
 
-async def _run_save(address_dicts: list[dict]):
-    global _job_active
+async def _run_save(address_dicts: list):
+    global _job_active, _job_cancelled
 
     try:
         from datetime import date
@@ -197,13 +208,16 @@ async def _run_save(address_dicts: list[dict]):
 
         browser = get_browser()
 
-        # Check login
+        # 로그인 확인: 저장된 쿠키 → Chrome 쿠키 → 수동 로그인 순서로 시도
         if not await browser.is_logged_in():
-            await _progress_queue.put({"type": "waiting_for_login"})
-            success = await browser.wait_for_login(timeout=120)
-            if not success:
-                await _progress_queue.put({"type": "done", "error": "로그인 타임아웃"})
-                return
+            await _progress_queue.put({"type": "trying_chrome_session"})
+            imported = await browser.try_import_chrome_session()
+            if not imported:
+                await _progress_queue.put({"type": "waiting_for_login"})
+                success = await browser.wait_for_login(timeout=120)
+                if not success:
+                    await _progress_queue.put({"type": "done", "error": "로그인 타임아웃"})
+                    return
 
         list_name = f"AUTO_{date.today().strftime('%Y%m%d')}"
         try:
@@ -213,6 +227,7 @@ async def _run_save(address_dicts: list[dict]):
                 addresses=address_dicts,
                 item_registry=_item_registry,
                 queue=_progress_queue,
+                is_cancelled=lambda: _job_cancelled,
             )
         except Exception as e:
             await _progress_queue.put({"type": "done", "error": str(e)})
