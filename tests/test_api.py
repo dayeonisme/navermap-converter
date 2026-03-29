@@ -60,6 +60,54 @@ def test_retry_422_잘못된_id():
     response = client.post("/retry", json={"ids": ["nonexistent-id-12345"]})
     assert response.status_code == 422
 
+def test_resolve_404_항목_없을때():
+    response = client.post("/resolve/nonexistent-id", json={"candidate_index": 0})
+    assert response.status_code == 404
+
+
+def test_resolve_422_ambiguous_아닌_항목():
+    from models import AddressItem
+    import main
+    item = AddressItem(raw_text="test", display_text="test addr", source_location="test", status="failed")
+    main._item_registry[item.id] = item
+    response = client.post(f"/resolve/{item.id}", json={"candidate_index": 0})
+    assert response.status_code == 422
+    del main._item_registry[item.id]
+
+
+def test_resolve_409_작업중():
+    from models import AddressItem
+    import main
+    item = AddressItem(raw_text="test", display_text="test addr", source_location="test", status="ambiguous")
+    main._item_registry[item.id] = item
+    main._job_active = True
+    response = client.post(f"/resolve/{item.id}", json={"candidate_index": 0})
+    assert response.status_code == 409
+    main._job_active = False
+    del main._item_registry[item.id]
+
+
+def test_resolve_성공():
+    from models import AddressItem
+    from unittest.mock import AsyncMock, patch
+    import main
+    item = AddressItem(raw_text="test", display_text="서울역", source_location="test", status="ambiguous")
+    main._item_registry[item.id] = item
+
+    mock_page = AsyncMock()
+    mock_browser = AsyncMock()
+    mock_browser.get_page = AsyncMock(return_value=mock_page)
+
+    with patch("main.get_browser", return_value=mock_browser), \
+         patch("naver.map_saver.save_one_by_index", new=AsyncMock(return_value="success")):
+        response = client.post(f"/resolve/{item.id}", json={"candidate_index": 1})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    assert main._item_registry[item.id].status == "success"
+    del main._item_registry[item.id]
+
+
 def test_retry_422_ambiguous_id():
     # Set up an ambiguous item in the registry
     from models import AddressItem

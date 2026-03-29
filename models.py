@@ -12,6 +12,7 @@ class AddressItem:
     source_location: str
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     status: Status = "pending"
+    candidates: list = field(default_factory=list)  # [{"name": ..., "address": ...}]
 
     def to_dict(self) -> dict:
         return {
@@ -20,4 +21,5 @@ class AddressItem:
             "display_text": self.display_text,
             "source_location": self.source_location,
             "status": self.status,
+            "candidates": self.candidates,
         }

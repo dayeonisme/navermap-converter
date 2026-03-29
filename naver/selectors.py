@@ -9,6 +9,8 @@ NAVER_MAIN = "https://www.naver.com"
 SEARCH_INPUT = "input.input_search"
 SEARCH_SUBMIT = "button.btn_search"
 SEARCH_RESULT_ITEM = "li.item"
+SEARCH_RESULT_NAME = ".place_name, .name"   # 각 결과 항목 내 장소명 (UI 변경 시 수정)
+SEARCH_RESULT_ADDR = ".addr, .road_addr"    # 각 결과 항목 내 주소 (UI 변경 시 수정)
 
 # 장소 저장
 PLACE_SAVE_BUTTON = "a.btn_save, button.btn_bookmark"

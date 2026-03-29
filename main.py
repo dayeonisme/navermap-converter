@@ -1,4 +1,5 @@
 # main.py
+from __future__ import annotations
 import asyncio
 import json
 import tempfile
@@ -108,6 +109,36 @@ async def save_addresses(req: SaveRequest):
     _job_active = True  # Set synchronously before create_task to prevent race
     asyncio.create_task(_run_save(req.addresses))
     return {"status": "accepted"}
+
+
+class ResolveRequest(BaseModel):
+    candidate_index: int
+
+
+@app.post("/resolve/{item_id}")
+async def resolve_ambiguous(item_id: str, req: ResolveRequest):
+    global _job_active
+    item = _item_registry.get(item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="항목을 찾을 수 없습니다")
+    if item.status != "ambiguous":
+        raise HTTPException(status_code=422, detail="ambiguous 상태의 항목만 선택할 수 있습니다")
+    if _job_active:
+        raise HTTPException(status_code=409, detail="이미 저장 작업이 진행 중입니다")
+
+    _job_active = True
+    try:
+        from datetime import date
+        from naver.map_saver import save_one_by_index
+
+        browser = get_browser()
+        page = await browser.get_page()
+        list_name = f"AUTO_{date.today().strftime('%Y%m%d')}"
+        status = await save_one_by_index(page, item.display_text, list_name, req.candidate_index)
+        item.status = status
+        return item.to_dict()
+    finally:
+        _job_active = False
 
 
 @app.post("/retry", status_code=202)
