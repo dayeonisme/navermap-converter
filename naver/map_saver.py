@@ -1,5 +1,7 @@
 # naver/map_saver.py
 import asyncio
+import sys
+from pathlib import Path
 from typing import Dict
 from models import AddressItem
 from naver.browser import NaverBrowser
@@ -8,8 +10,6 @@ from naver import selectors as S
 
 async def _screenshot(page, step: str):
     """실패 시 디버그 스크린샷 저장."""
-    import sys
-    from pathlib import Path
     try:
         path = Path(__file__).parent.parent / "sessions" / f"debug_{step}.png"
         path.parent.mkdir(exist_ok=True)
@@ -21,7 +21,6 @@ async def _screenshot(page, step: str):
 
 async def _create_list(page, list_name: str) -> None:
     """Create a new private list on Naver Maps. Raises RuntimeError on failure."""
-    import sys
     step = "init"
     try:
         step = "goto"
@@ -102,7 +101,6 @@ async def _save_one(page, address: str, list_name: str) -> dict:
 
         return {"status": "failed", "candidates": []}
     except Exception as e:
-        import sys
         print(f"[map_saver] Error saving '{address}': {type(e).__name__}: {e}", file=sys.stderr)
         return {"status": "failed", "candidates": []}
 
@@ -110,8 +108,8 @@ async def _save_one(page, address: str, list_name: str) -> dict:
 async def save_one_by_index(page, address: str, list_name: str, index: int) -> str:
     """Re-search address and save the result at the given index. Returns 'success'|'failed'."""
     try:
-        await page.goto(S.MAP_URL)
-        await page.wait_for_load_state("networkidle", timeout=15000)
+        await page.goto(S.MAP_URL, wait_until="load")
+        await page.wait_for_timeout(2000)
 
         await page.fill(S.SEARCH_INPUT, address)
         await page.click(S.SEARCH_SUBMIT)
@@ -137,7 +135,6 @@ async def save_one_by_index(page, address: str, list_name: str, index: int) -> s
 
         return "failed"
     except Exception as e:
-        import sys
         print(f"[map_saver] Error resolving '{address}' index={index}: {type(e).__name__}: {e}", file=sys.stderr)
         return "failed"
 

@@ -8,7 +8,7 @@ from typing import AsyncGenerator
 
 import uvicorn
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 from models import AddressItem
@@ -264,8 +264,7 @@ async def debug_links():
 @app.get("/debug/screenshot")
 async def debug_screenshot():
     """브라우저 현재 화면을 sessions/debug_manual.png 로 저장 후 경로 반환."""
-    from fastapi.responses import FileResponse
-    from pathlib import Path
+    # TODO: 선택자 검증 완료 후 디버그 엔드포인트 3개 (/debug/*) 삭제
     browser = get_browser()
     page = await browser.get_page()
     path = Path(__file__).parent / "sessions" / "debug_manual.png"
