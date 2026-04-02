@@ -6,34 +6,52 @@ from naver.browser import NaverBrowser
 from naver import selectors as S
 
 
+async def _screenshot(page, step: str):
+    """실패 시 디버그 스크린샷 저장."""
+    import sys
+    from pathlib import Path
+    try:
+        path = Path(__file__).parent.parent / "sessions" / f"debug_{step}.png"
+        path.parent.mkdir(exist_ok=True)
+        await page.screenshot(path=str(path), full_page=False)
+        print(f"[debug] 스크린샷 저장: {path}", file=sys.stderr)
+    except Exception as se:
+        print(f"[debug] 스크린샷 실패: {se}", file=sys.stderr)
+
+
 async def _create_list(page, list_name: str) -> None:
     """Create a new private list on Naver Maps. Raises RuntimeError on failure."""
+    import sys
+    step = "init"
     try:
-        await page.goto(S.MAP_URL)
-        await page.wait_for_load_state("networkidle", timeout=15000)
+        step = "goto"
+        await page.goto(S.MAP_URL, wait_until="load")
+        await page.wait_for_timeout(2000)  # JS 초기화 대기
+        print(f"[map_saver] 페이지 로드 완료: {page.url}", file=sys.stderr)
 
-        # Click My Places menu
+        step = "my_place_menu"
         await page.click(S.MY_PLACE_MENU, timeout=10000)
         await page.wait_for_timeout(1000)
 
-        # Click Create New List
+        step = "create_list_button"
         await page.click(S.CREATE_LIST_BUTTON, timeout=10000)
         await page.wait_for_timeout(500)
 
-        # Enter list name
+        step = "list_name_input"
         await page.fill(S.LIST_NAME_INPUT, list_name)
         await page.wait_for_timeout(300)
 
-        # Select private visibility
+        step = "privacy_private"
         await page.click(S.LIST_PRIVACY_PRIVATE, timeout=5000)
         await page.wait_for_timeout(300)
 
-        # Confirm
+        step = "confirm"
         await page.click(S.LIST_CONFIRM_BUTTON, timeout=5000)
         await page.wait_for_timeout(1000)
 
     except Exception as e:
-        raise RuntimeError(f"리스트 생성 실패: {e}")
+        await _screenshot(page, f"create_list_fail_{step}")
+        raise RuntimeError(f"리스트 생성 실패 [{step}]: {e}")
 
 
 async def _extract_candidates(results) -> list:
@@ -53,8 +71,8 @@ async def _save_one(page, address: str, list_name: str) -> dict:
     Returns {"status": "success"|"failed"|"ambiguous", "candidates": [...]}
     """
     try:
-        await page.goto(S.MAP_URL)
-        await page.wait_for_load_state("networkidle", timeout=15000)
+        await page.goto(S.MAP_URL, wait_until="load")
+        await page.wait_for_timeout(2000)
 
         # Search
         await page.fill(S.SEARCH_INPUT, address)

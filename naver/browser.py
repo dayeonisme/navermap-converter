@@ -26,7 +26,7 @@ class NaverBrowser:
         if self._started:
             return
         self._playwright = await async_playwright().start()
-        self._browser = await self._playwright.chromium.launch(headless=False)
+        self._browser = await self._playwright.chromium.launch(headless=False, channel="chrome")
         self._context = await self._browser.new_context()
         self._page = await self._context.new_page()
 

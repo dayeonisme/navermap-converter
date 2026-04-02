@@ -235,6 +235,45 @@ async def _run_save(address_dicts: list):
         _job_active = False  # Always clear flag on completion or error
 
 
+# ── Debug ─────────────────────────────────────────────────────
+
+@app.get("/debug/frames")
+async def debug_frames():
+    """현재 페이지의 모든 frame URL 목록 반환."""
+    browser = get_browser()
+    page = await browser.get_page()
+    frames = [{"url": f.url, "name": f.name} for f in page.frames]
+    return {"frames": frames}
+
+
+@app.get("/debug/links")
+async def debug_links():
+    """현재 페이지의 모든 a 태그 href + text 반환 (선택자 디버그용)."""
+    browser = get_browser()
+    page = await browser.get_page()
+    links = await page.evaluate("""() => {
+        return Array.from(document.querySelectorAll('a')).map(a => ({
+            href: a.getAttribute('href') || '',
+            text: a.innerText.trim().slice(0, 40),
+            cls: a.className.slice(0, 60),
+        }));
+    }""")
+    return {"url": page.url, "links": links}
+
+
+@app.get("/debug/screenshot")
+async def debug_screenshot():
+    """브라우저 현재 화면을 sessions/debug_manual.png 로 저장 후 경로 반환."""
+    from fastapi.responses import FileResponse
+    from pathlib import Path
+    browser = get_browser()
+    page = await browser.get_page()
+    path = Path(__file__).parent / "sessions" / "debug_manual.png"
+    path.parent.mkdir(exist_ok=True)
+    await page.screenshot(path=str(path), full_page=False)
+    return FileResponse(str(path), media_type="image/png")
+
+
 # ── Static files ──────────────────────────────────────────────
 
 @app.get("/")
