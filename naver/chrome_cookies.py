@@ -62,15 +62,17 @@ def _read_cookies(db_path: str, aes_key: bytes) -> List[dict]:
     for name, value, host, path, is_secure, enc_value in rows:
         if enc_value and enc_value[:3] == b"v10":
             try:
+                # macOS Chrome v80+: AES-128-GCM
+                # 구조: [v10(3)][nonce(12)][ciphertext][tag(16)]
+                nonce = enc_value[3:15]
+                ciphertext = enc_value[15:]
                 cipher = Cipher(
                     algorithms.AES(aes_key),
-                    modes.CBC(b" " * 16),
+                    modes.GCM(nonce),
                     backend=default_backend(),
                 )
                 dec = cipher.decryptor()
-                raw = dec.update(enc_value[3:]) + dec.finalize()
-                pad = raw[-1]  # PKCS7 패딩 제거
-                value = raw[:-pad].decode("utf-8", errors="ignore")
+                value = (dec.update(ciphertext) + dec.finalize()).decode("utf-8", errors="ignore")
             except Exception:
                 continue  # 복호화 실패 시 해당 쿠키 건너뜀
 
