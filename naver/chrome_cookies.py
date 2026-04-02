@@ -17,10 +17,16 @@ def get_naver_cookies_from_chrome() -> List[dict]:
     실패 시 빈 리스트 반환 (예외를 올리지 않음).
     """
     try:
-        cookie_db = os.path.expanduser(
-            "~/Library/Application Support/Google/Chrome/Default/Network/Cookies"
+        # Chrome 버전에 따라 경로가 다름 (Network/ 서브디렉토리 유무)
+        base = os.path.expanduser("~/Library/Application Support/Google/Chrome/Default")
+        cookie_db = next(
+            (p for p in [
+                os.path.join(base, "Network", "Cookies"),
+                os.path.join(base, "Cookies"),
+            ] if os.path.exists(p)),
+            None,
         )
-        if not os.path.exists(cookie_db):
+        if cookie_db is None:
             return []
 
         # macOS Keychain에서 Chrome 암호화 키 가져오기
@@ -62,17 +68,16 @@ def _read_cookies(db_path: str, aes_key: bytes) -> List[dict]:
     for name, value, host, path, is_secure, enc_value in rows:
         if enc_value and enc_value[:3] == b"v10":
             try:
-                # macOS Chrome v80+: AES-128-GCM
-                # 구조: [v10(3)][nonce(12)][ciphertext][tag(16)]
-                nonce = enc_value[3:15]
-                ciphertext = enc_value[15:]
+                # macOS Chrome: AES-128-CBC, IV = 0x20 * 16, PKCS7 패딩
                 cipher = Cipher(
                     algorithms.AES(aes_key),
-                    modes.GCM(nonce),
+                    modes.CBC(b" " * 16),
                     backend=default_backend(),
                 )
                 dec = cipher.decryptor()
-                value = (dec.update(ciphertext) + dec.finalize()).decode("utf-8", errors="ignore")
+                raw = dec.update(enc_value[3:]) + dec.finalize()
+                pad = raw[-1]
+                value = raw[:-pad].decode("utf-8", errors="ignore")
             except Exception:
                 continue  # 복호화 실패 시 해당 쿠키 건너뜀
 
