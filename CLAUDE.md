@@ -64,8 +64,20 @@ python tests/create_fixtures.py
 - **API:** `fastapi.testclient.TestClient` (동기 모드)
 - `pytest.ini`에 `asyncio_mode = auto` 설정됨 — `@pytest.mark.asyncio` 데코레이터 불필요
 
+## SSE 이벤트 스키마
+
+`/progress` SSE 스트림에서 전달되는 이벤트 타입:
+
+| `type` | 설명 |
+|--------|------|
+| `trying_chrome_session` | Chrome 쿠키 임포트 시도 중 |
+| `waiting_for_login` | 수동 로그인 대기 중 |
+| `item_saved` | 개별 항목 저장 완료. `id`, `status`, `candidates` 필드 포함 |
+| `cancelled` | 취소 완료 |
+| `done` | 배치 완료. `summary` (성공/실패/ambiguous 카운트) 또는 `error` 필드 포함 |
+
 ## 알려진 이슈 / 다음 작업
 
-- `naver/selectors.py` 선택자가 현재 네이버 지도 UI와 일치하는지 실제 브라우저로 검증 필요
 - `ambiguous` 항목 UI 내 수동 선택 기능 미구현 (현재 Out of Scope)
 - OCR 사용 시 시스템에 Tesseract + `kor.traineddata` 별도 설치 필요
+- Linux Chrome 쿠키 임포트는 Gnome Keyring / KDE Wallet 미지원 — Chrome이 시크릿 스토리지를 사용하지 않는 환경(비밀번호 없이 설치)에서만 동작

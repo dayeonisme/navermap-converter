@@ -7,14 +7,29 @@ from parser.text_parser import extract_addresses
 
 def _ocr_page(page) -> str:
     """pdfplumber 페이지를 이미지로 변환 후 OCR."""
+    import sys
     try:
         import pytesseract
     except ImportError:
+        print(
+            "[pdf_parser] OCR 불가: pytesseract 미설치. `pip install pytesseract` 후 "
+            "Tesseract OCR 엔진(https://github.com/tesseract-ocr/tesseract)과 "
+            "한국어 데이터(kor.traineddata)를 설치하세요.",
+            file=sys.stderr,
+        )
         return ""
 
-    # pdfplumber page.to_image()로 PIL 이미지 직접 획득 (pdf2image 불필요)
-    pil_image = page.to_image(resolution=300).original
-    return pytesseract.image_to_string(pil_image, lang="kor+eng")
+    try:
+        pil_image = page.to_image(resolution=300).original
+        return pytesseract.image_to_string(pil_image, lang="kor+eng")
+    except pytesseract.TesseractNotFoundError:
+        print(
+            "[pdf_parser] OCR 불가: Tesseract 실행 파일을 찾을 수 없습니다. "
+            "Tesseract OCR 엔진을 설치하고 PATH에 추가하세요. "
+            "한국어 지원은 kor.traineddata 파일도 필요합니다.",
+            file=sys.stderr,
+        )
+        return ""
 
 def parse_pdf(path: Path) -> List[AddressItem]:
     """PDF 파일에서 주소 추출. 텍스트 추출 실패 시 OCR 폴백."""

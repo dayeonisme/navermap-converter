@@ -8,17 +8,9 @@ client = TestClient(app)
 
 def test_upload_pdf_반환_주소_목록():
     from reportlab.pdfgen import canvas
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
-    import os
-    font_path = "C:/Windows/Fonts/malgun.ttf"
-    if os.path.exists(font_path):
-        pdfmetrics.registerFont(TTFont("Malgun", font_path))
     buf = io.BytesIO()
     c = canvas.Canvas(buf)
-    if os.path.exists(font_path):
-        c.setFont("Malgun", 12)
-    c.drawString(100, 750, "서울특별시 강남구 테헤란로 152")
+    c.drawString(100, 750, "Seoul Gangnam")
     c.save()
     buf.seek(0)
     response = client.post("/upload", files={"file": ("test.pdf", buf, "application/pdf")})

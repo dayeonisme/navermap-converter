@@ -63,6 +63,16 @@
   <h1>네이버 지도 주소 변환기</h1>
 
   <div class="card">
+    <h2>저장할 리스트 이름</h2>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <input type="text" id="listNameInput" placeholder="비우면 자동 생성 (Auto_YYYYMMDD_HHMM)"
+        style="flex:1; padding:8px 12px; border:1px solid #ddd; border-radius:8px; font-size:.9rem; outline:none;"
+        onfocus="this.style.borderColor='#03c75a'" onblur="this.style.borderColor='#ddd'">
+    </div>
+    <p style="margin-top:8px; font-size:.8rem; color:#999;">기존 리스트에 추가하려면 해당 리스트 이름을 입력하세요. 비워두면 새 리스트가 자동 생성됩니다.</p>
+  </div>
+
+  <div class="card">
     <h2>파일 업로드</h2>
     <div class="upload-zone" id="uploadZone">
       <svg width="40" height="40" fill="none" stroke="#ccc" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -82,7 +92,7 @@
   <div class="card hidden" id="addressCard">
     <h2>추출된 주소 목록 <span id="addressCount" style="color:#999;font-weight:400"></span></h2>
     <ul id="addressList"></ul>
-    <div style="margin-top:16px">
+    <div>
       <button class="btn btn-primary" id="saveBtn" onclick="startSave()">저장 시작</button>
       <button class="btn btn-secondary" id="retryBtn" onclick="startRetry()" style="display:none">실패 항목 재시도</button>
       <button class="btn btn-secondary" id="cancelBtn" onclick="cancelSave()" style="display:none;background:#fee2e2;color:#b91c1c">저장 취소</button>
@@ -248,7 +258,12 @@
   }
 
   async function startSave() {
-    const payload = addresses.filter(a => a.status !== 'success').map(a => ({id: a.id, display_text: a.display_text}));
+    const listName = document.getElementById('listNameInput').value.trim() || null;
+    // 리스트명 지정 시 전체 항목 재저장, 미지정 시 미완료 항목만
+    const payload = addresses
+      .filter(a => a.status !== 'unrecognized')
+      .filter(a => listName ? true : (a.status !== 'success'))
+      .map(a => ({id: a.id, display_text: a.display_text}));
     if (!payload.length) { alert('저장할 항목이 없습니다'); return; }
 
     document.getElementById('saveBtn').disabled = true;
@@ -259,7 +274,7 @@
     total = payload.length;
     updateProgress(0, '저장 시작 중...');
 
-    const res = await fetch('/save', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({addresses: payload}) });
+    const res = await fetch('/save', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({addresses: payload, list_name: listName}) });
     if (!res.ok) {
       const err = await res.json();
       alert('오류: ' + (err.detail || JSON.stringify(err)));
@@ -331,7 +346,7 @@
         return;
       }
 
-      if (data.id) {
+      if (data.type === 'item_saved') {
         done++;
         updateItemStatus(data.id, data.status, data.candidates);
         updateProgress(Math.round(done / total * 100), `저장 중... (${done}/${total})`);
