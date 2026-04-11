@@ -16,7 +16,7 @@ def test_id_자동_생성():
 def test_to_dict_필드():
     item = AddressItem(display_text="서울특별시 강남구 테헤란로 152", raw_text="raw", source_location="PDF 1페이지")
     d = item.to_dict()
-    assert set(d.keys()) == {"id", "raw_text", "display_text", "source_location", "status", "candidates"}
+    assert set(d.keys()) == {"id", "raw_text", "display_text", "source_location", "status", "candidates", "alias"}
     assert d["display_text"] == "서울특별시 강남구 테헤란로 152"
     assert d["status"] == "pending"
 
@@ -31,3 +31,14 @@ def test_to_dict_candidates_포함():
     item.candidates = [{"name": "서울역", "address": "서울 중구"}]
     d = item.to_dict()
     assert d["candidates"] == [{"name": "서울역", "address": "서울 중구"}]
+
+
+def test_alias_기본값_빈문자열():
+    item = AddressItem(raw_text="t", display_text="t", source_location="t")
+    assert item.alias == ""
+
+
+def test_alias_to_dict_포함():
+    item = AddressItem(raw_text="t", display_text="t", source_location="t", alias="판교타워")
+    d = item.to_dict()
+    assert d["alias"] == "판교타워"
