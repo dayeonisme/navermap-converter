@@ -63,6 +63,7 @@ def test_건물명_없으면_빈문자열():
     assert items[0].alias == ""
 
 def test_기호만_앞텍스트는_건물명_아님():
-    text = "※ 공고 경기도 성남시 분당구 서현로 192"
+    # 순수 기호만 있는 경우
+    text = "※→# 경기도 성남시 분당구 서현로 192"
     items = extract_addresses(text, "테스트")
     assert items[0].alias == ""
