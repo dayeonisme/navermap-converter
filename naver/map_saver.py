@@ -123,7 +123,7 @@ async def _extract_candidates(results) -> list:
     return candidates
 
 
-async def _save_in_entry_frame(page, list_name: str) -> bool:
+async def _save_in_entry_frame(page, list_name: str, alias: str = "") -> bool:
     """entryIframe 내에서 저장 버튼 클릭 → 리스트 선택 → 저장 확인.
     Returns True on success, False on failure."""
     # entryIframe 등장 대기 (최대 5초)
@@ -153,6 +153,14 @@ async def _save_in_entry_frame(page, list_name: str) -> bool:
             if list_name in text:
                 await item.click()
                 await page.wait_for_timeout(500)
+                if alias:
+                    try:
+                        await entry_frame.click(S.PLACE_SAVE_MEMO_BTN, timeout=3000)
+                        await page.wait_for_timeout(300)
+                        await entry_frame.fill(S.PLACE_SAVE_ALIAS_INPUT, alias)
+                        await page.wait_for_timeout(300)
+                    except Exception as ae:
+                        print(f"[map_saver] 별명 입력 실패 (저장은 계속): {ae}", file=sys.stderr)
                 await entry_frame.click(S.PLACE_SAVE_CONFIRM, timeout=3000)
                 await page.wait_for_timeout(500)
                 return True
@@ -171,7 +179,7 @@ async def _save_in_entry_frame(page, list_name: str) -> bool:
         return False
 
 
-async def _try_address_place(page, list_name: str):
+async def _try_address_place(page, list_name: str, alias: str = ""):
     """이 주소의 장소 섹션의 첫 번째 장소를 entryIframe으로 저장.
     Returns: True (저장 성공), False (장소 찾았지만 저장 실패), None (장소 섹션 없음).
     """
@@ -181,11 +189,11 @@ async def _try_address_place(page, list_name: str):
         return None  # 장소 섹션 없음 → _save_address_page 로 fallback 가능
     await first_place.click()
     await page.wait_for_timeout(1000)
-    ok = await _save_in_entry_frame(page, list_name)
+    ok = await _save_in_entry_frame(page, list_name, alias=alias)
     return ok  # True or False (이미 페이지 이동됨 — fallback 불가)
 
 
-async def _save_address_page(page, list_name: str) -> bool:
+async def _save_address_page(page, list_name: str, alias: str = "") -> bool:
     """/address/ 페이지에서 주소 카드의 저장 버튼 클릭 → 메인 DOM 리스트 선택.
     Returns True on success, False on failure."""
     await page.wait_for_timeout(2000)
@@ -208,6 +216,14 @@ async def _save_address_page(page, list_name: str) -> bool:
         if list_name in text:
             await item.click()
             await page.wait_for_timeout(500)
+            if alias:
+                try:
+                    await page.click(S.PLACE_SAVE_MEMO_BTN, timeout=3000)
+                    await page.wait_for_timeout(300)
+                    await page.fill(S.PLACE_SAVE_ALIAS_INPUT, alias)
+                    await page.wait_for_timeout(300)
+                except Exception as ae:
+                    print(f"[map_saver] 별명 입력 실패 (저장은 계속): {ae}", file=sys.stderr)
             await page.click(S.PLACE_SAVE_CONFIRM, timeout=3000)
             await page.wait_for_timeout(500)
             return True
@@ -216,7 +232,7 @@ async def _save_address_page(page, list_name: str) -> bool:
     return False
 
 
-async def _save_one(page, address: str, list_name: str) -> dict:
+async def _save_one(page, address: str, list_name: str, alias: str = "") -> dict:
     """Search for address and save to named list.
     Returns {"status": "success"|"failed"|"ambiguous", "candidates": [...]}
     """
@@ -228,10 +244,10 @@ async def _save_one(page, address: str, list_name: str) -> dict:
         # /address/ 리다이렉트 → 단일 주소 결과 직접 표시 (메인 프레임에 렌더링, iframe 없음)
         if "/address/" in page.url:
             # 이 주소의 장소 섹션에 장소가 있으면 첫 번째 장소를 entryIframe으로 저장
-            place_result = await _try_address_place(page, list_name)
+            place_result = await _try_address_place(page, list_name, alias=alias)
             if place_result is None:
                 # 장소 섹션 없음 → 주소 자체를 리스트에 저장
-                success = await _save_address_page(page, list_name)
+                success = await _save_address_page(page, list_name, alias=alias)
             else:
                 # 장소 클릭 후 결과 (페이지 이미 이동됨 — address 저장 불가)
                 success = place_result
@@ -264,7 +280,7 @@ async def _save_one(page, address: str, list_name: str) -> dict:
         await results[0].click()
         await page.wait_for_timeout(1000)
 
-        success = await _save_in_entry_frame(page, list_name)
+        success = await _save_in_entry_frame(page, list_name, alias=alias)
         return {"status": "success" if success else "failed", "candidates": []}
     except Exception as e:
         print(f"[map_saver] Error saving '{address}': {type(e).__name__}: {e}", file=sys.stderr)
@@ -376,11 +392,12 @@ async def save_addresses_to_naver(
 
         id_ = addr_dict["id"]
         display_text = addr_dict["display_text"]
+        alias = addr_dict.get("alias", "")
 
         # 새 탭에서 실행 — _create_list의 MY_PLACE 패널 SPA 상태와 격리
         tab = await browser.new_page()
         try:
-            result = await _save_one(tab, display_text, list_name)
+            result = await _save_one(tab, display_text, list_name, alias=alias)
         finally:
             await tab.close()
         status = result["status"]

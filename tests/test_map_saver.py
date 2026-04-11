@@ -185,3 +185,39 @@ async def test_save_addresses_to_naver_취소():
     assert any(e.get("type") == "cancelled" for e in events)
     # Item should not have been saved
     assert item.status == "pending"
+
+
+@pytest.mark.asyncio
+async def test_save_in_entry_frame_별명_입력():
+    """alias가 있으면 메모 버튼 클릭 후 alias fill 호출."""
+    from naver.map_saver import _save_in_entry_frame
+
+    page = AsyncMock()
+    entry_frame = AsyncMock()
+    list_item = AsyncMock()
+    list_item.inner_text = AsyncMock(return_value="AUTO_20260405")
+    entry_frame.query_selector_all = AsyncMock(return_value=[list_item])
+
+    with patch("naver.map_saver._get_entry_frame", return_value=entry_frame):
+        result = await _save_in_entry_frame(page, "AUTO_20260405", alias="판교타워")
+
+    assert result is True
+    entry_frame.fill.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_save_in_entry_frame_별명_없으면_fill_안호출():
+    """alias가 없으면 entry_frame.fill을 호출하지 않음."""
+    from naver.map_saver import _save_in_entry_frame
+
+    page = AsyncMock()
+    entry_frame = AsyncMock()
+    list_item = AsyncMock()
+    list_item.inner_text = AsyncMock(return_value="AUTO_20260405")
+    entry_frame.query_selector_all = AsyncMock(return_value=[list_item])
+
+    with patch("naver.map_saver._get_entry_frame", return_value=entry_frame):
+        result = await _save_in_entry_frame(page, "AUTO_20260405", alias="")
+
+    assert result is True
+    entry_frame.fill.assert_not_called()
