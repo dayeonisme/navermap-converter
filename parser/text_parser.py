@@ -39,15 +39,36 @@ def _dedup_key(addr: str) -> str:
     return re.sub(r'\s', '', addr)
 
 
+# 앞뒤에서 제거할 기호 패턴 (원문자, 화살표, 불릿, 특수 마크 등)
+_SYMBOL_LEAD = re.compile(r'^[\s①②③④⑤⑥⑦⑧⑨⑩※→←↑↓⇒▶►▸◆◇●○■□△▲★☆•·▪\-–—＊]+')
+_SYMBOL_TRAIL = re.compile(r'[\s①②③④⑤⑥⑦⑧⑨⑩※→←↑↓⇒▶►▸◆◇●○■□△▲★☆•·▪\-–—＊]+$')
+
+# 한국어 서술형 어미 — 문장 끝이면 건물명이 아님
+_VERB_ENDING = re.compile(
+    r'(합니다|습니다|됩니다|입니다|겠습니다|겠어요|하세요|하십시오'
+    r'|한다|된다|있다|없다|하다|이다|어요|아요|예요|이에요)$'
+)
+
+
+def _clean_alias(text: str) -> str:
+    """앞뒤 기호·불릿·원문자를 제거하고 공백 정규화."""
+    cleaned = _SYMBOL_LEAD.sub('', text)
+    cleaned = _SYMBOL_TRAIL.sub('', cleaned)
+    return re.sub(r'\s+', ' ', cleaned).strip()
+
+
 def _is_valid_alias(candidate: str) -> bool:
-    """건물명으로 적합한지 판단."""
-    if not candidate or len(candidate) > 30:
+    """건물명으로 적합한지 판단 (특수문자 제거 후 호출 전제)."""
+    if not candidate or len(candidate) < 2 or len(candidate) > 30:
         return False
     # 문장 종결 부호가 있으면 일반 문장으로 판단
     if re.search(r'[.。!?]', candidate):
         return False
     # 한글 또는 알파벳이 없으면 건물명 아님 (기호·숫자만인 경우 포함)
     if not re.search(r'[가-힣a-zA-Z]', candidate):
+        return False
+    # 서술형 동사 어미로 끝나면 문장으로 판단
+    if _VERB_ENDING.search(candidate):
         return False
     return True
 
@@ -60,7 +81,7 @@ def _find_alias(text: str, match_start: int) -> str:
     # 같은 줄에서 주소 앞 텍스트
     line_start = text.rfind('\n', 0, match_start)
     line_start = line_start + 1 if line_start >= 0 else 0
-    same_line_prefix = text[line_start:match_start].strip()
+    same_line_prefix = _clean_alias(text[line_start:match_start].strip())
 
     if _is_valid_alias(same_line_prefix):
         return same_line_prefix
@@ -70,7 +91,7 @@ def _find_alias(text: str, match_start: int) -> str:
         prev_line_end = line_start - 1  # 앞 \n 직전
         prev_line_start = text.rfind('\n', 0, prev_line_end)
         prev_line_start = prev_line_start + 1 if prev_line_start >= 0 else 0
-        prev_line = text[prev_line_start:prev_line_end].strip()
+        prev_line = _clean_alias(text[prev_line_start:prev_line_end].strip())
         if _is_valid_alias(prev_line):
             return prev_line
 
