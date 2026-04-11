@@ -46,8 +46,11 @@ def _is_valid_alias(candidate: str) -> bool:
     # 문장 종결 부호가 있으면 일반 문장으로 판단
     if re.search(r'[.。!?]', candidate):
         return False
-    # 숫자·기호·공백만이면 건물명 아님
-    if re.match(r'^[\d\s\-()①②③④⑤⑥⑦⑧⑨⑩.,:]+$', candidate):
+    # 한글 또는 알파벳이 없으면 건물명 아님 (기호·숫자만인 경우 포함)
+    if not re.search(r'[가-힣a-zA-Z]', candidate):
+        return False
+    # 한국 문서 마커로 시작하면 건물명 아님
+    if re.match(r'^[#※→▶■●○△□]+', candidate):
         return False
     return True
 
