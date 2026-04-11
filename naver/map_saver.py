@@ -156,7 +156,7 @@ async def _save_in_entry_frame(page, list_name: str, alias: str = "") -> bool:
                 if alias:
                     try:
                         await entry_frame.click(S.PLACE_SAVE_MEMO_BTN, timeout=3000)
-                        await page.wait_for_timeout(300)
+                        await page.wait_for_timeout(500)
                         await entry_frame.fill(S.PLACE_SAVE_ALIAS_INPUT, alias)
                         await page.wait_for_timeout(300)
                     except Exception as ae:

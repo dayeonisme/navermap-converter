@@ -80,6 +80,6 @@ python tests/create_fixtures.py
 
 ## 알려진 이슈 / 다음 작업
 
-- `PLACE_SAVE_ALIAS_INPUT` 선택자(`naver/selectors.py`)는 실제 Naver Maps 저장 다이얼로그에서 미검증 — 별명 입력 실패 시 저장은 계속 진행되며 stderr에 경고 출력
+- 별명 입력 선택자(`PLACE_SAVE_MEMO_BTN`, `PLACE_SAVE_ALIAS_INPUT`)는 2026-04-12 실제 UI 검증 완료. 별명 입력 실패 시 저장은 계속 진행되며 stderr에 경고 출력
 - OCR 사용 시 시스템에 Tesseract + `kor.traineddata` 별도 설치 필요
 - Linux Chrome 쿠키 임포트는 Gnome Keyring / KDE Wallet 미지원 — Chrome이 시크릿 스토리지를 사용하지 않는 환경(비밀번호 없이 설치)에서만 동작
