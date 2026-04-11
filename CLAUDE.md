@@ -51,7 +51,9 @@ python tests/create_fixtures.py
 
 **세션 관리:** `naver/browser.py`는 Playwright 싱글톤. 로그인 상태는 `NID_AUT` 쿠키 존재 여부로 판단 (페이지 이동 없음). 로그인 필요 시 브라우저 창을 열고 쿠키 등장을 폴링 (최대 120초). 쿠키는 `sessions/naver_cookies.json`에 저장 (git 제외).
 
-**주소 상태:** `pending → success | failed | ambiguous | unrecognized`. `ambiguous`는 재시도 불가 (검색 결과 복수 → 수동 처리). `failed`만 `/retry` 허용.
+**주소 상태:** `pending → success | failed | ambiguous | unrecognized`. `ambiguous`는 재시도 불가 (검색 결과 복수 → UI 모달에서 수동 후보 선택). `failed`만 `/retry` 허용.
+
+**건물명(별명) 자동 추출:** `parser/text_parser.py`의 `_find_alias()`가 주소 매칭 위치 기준으로 같은 줄 앞 텍스트 → 바로 윗 줄 순서로 건물명 후보를 탐색해 `AddressItem.alias`에 저장. `_is_valid_alias()`는 한글·알파벳 포함, 30자 이하, 문장 종결 부호 없음을 양성 조건으로 판단. UI에서 사용자가 수정 가능하며, 저장 시 네이버 지도 '+ 메모,별명,URL 추가' 버튼을 통해 별명으로 등록.
 
 ### 네이버 UI 선택자
 
@@ -78,6 +80,6 @@ python tests/create_fixtures.py
 
 ## 알려진 이슈 / 다음 작업
 
-- `ambiguous` 항목 UI 내 수동 선택 기능 미구현 (현재 Out of Scope)
+- `PLACE_SAVE_ALIAS_INPUT` 선택자(`naver/selectors.py`)는 실제 Naver Maps 저장 다이얼로그에서 미검증 — 별명 입력 실패 시 저장은 계속 진행되며 stderr에 경고 출력
 - OCR 사용 시 시스템에 Tesseract + `kor.traineddata` 별도 설치 필요
 - Linux Chrome 쿠키 임포트는 Gnome Keyring / KDE Wallet 미지원 — Chrome이 시크릿 스토리지를 사용하지 않는 환경(비밀번호 없이 설치)에서만 동작
