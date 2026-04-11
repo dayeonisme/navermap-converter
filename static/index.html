@@ -35,6 +35,9 @@
   .badge-unrecognized { background: #f3f4f6; color: #6b7280; }
   .addr-text { flex: 1; font-size: .9rem; padding: 4px 8px; border: 1px solid transparent; border-radius: 4px; }
   .addr-text:focus { border-color: #03c75a; outline: none; }
+  .alias-input { width: 140px; font-size: .82rem; padding: 4px 8px; border: 1px solid #e5e7eb; border-radius: 4px; color: #555; }
+  .alias-input:focus { border-color: #03c75a; outline: none; }
+  .alias-input::placeholder { color: #bbb; }
   .source { font-size: .75rem; color: #999; white-space: nowrap; }
 
   .progress-bar-wrap { background: #eee; border-radius: 8px; height: 8px; margin: 12px 0; overflow: hidden; }
@@ -179,6 +182,7 @@
       li.innerHTML = `
         <span class="badge badge-${item.status}"${badgeExtra} onclick="openResolveModal('${item.id}')">${statusLabel(item.status)}</span>
         <input class="addr-text" value="${esc(item.display_text)}" data-id="${item.id}" onchange="updateText(this)">
+        <input class="alias-input" value="${esc(item.alias||'')}" placeholder="별명" data-id="${item.id}" onchange="updateAlias(this)">
         <span class="source">${esc(item.source_location)}</span>
       `;
       list.appendChild(li);
@@ -194,6 +198,11 @@
   function updateText(input) {
     const item = addresses.find(a => a.id === input.dataset.id);
     if (item) item.display_text = input.value;
+  }
+
+  function updateAlias(input) {
+    const item = addresses.find(a => a.id === input.dataset.id);
+    if (item) item.alias = input.value;
   }
 
   function updateItemStatus(id, status, candidates) {
@@ -263,7 +272,7 @@
     const payload = addresses
       .filter(a => a.status !== 'unrecognized')
       .filter(a => listName ? true : (a.status !== 'success'))
-      .map(a => ({id: a.id, display_text: a.display_text}));
+      .map(a => ({id: a.id, display_text: a.display_text, alias: a.alias || ''}));
     if (!payload.length) { alert('저장할 항목이 없습니다'); return; }
 
     document.getElementById('saveBtn').disabled = true;

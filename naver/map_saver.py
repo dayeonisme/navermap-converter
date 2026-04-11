@@ -287,7 +287,7 @@ async def _save_one(page, address: str, list_name: str, alias: str = "") -> dict
         return {"status": "failed", "candidates": []}
 
 
-async def save_one_by_index(page, address: str, list_name: str, index: int) -> str:
+async def save_one_by_index(page, address: str, list_name: str, index: int, alias: str = "") -> str:
     """Re-search address and save the result at the given index. Returns 'success'|'failed'."""
     try:
         search_url = S.SEARCH_URL.format(query=urllib.parse.quote(address))
@@ -295,7 +295,7 @@ async def save_one_by_index(page, address: str, list_name: str, index: int) -> s
         await page.wait_for_timeout(1000)
 
         if "/address/" in page.url:
-            success = await _save_address_page(page, list_name)
+            success = await _save_address_page(page, list_name, alias=alias)
             return "success" if success else "failed"
 
         frame = None
@@ -318,7 +318,7 @@ async def save_one_by_index(page, address: str, list_name: str, index: int) -> s
         await results[index].click()
         await page.wait_for_timeout(1000)
 
-        success = await _save_in_entry_frame(page, list_name)
+        success = await _save_in_entry_frame(page, list_name, alias=alias)
         return "success" if success else "failed"
     except Exception as e:
         print(f"[map_saver] Error resolving '{address}' index={index}: {type(e).__name__}: {e}", file=sys.stderr)

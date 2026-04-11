@@ -165,7 +165,7 @@ async def resolve_ambiguous(item_id: str, req: ResolveRequest):
         browser = get_browser()
         page = await browser.get_page()
         list_name = _current_list_name or f"Auto_{datetime.now().strftime('%Y%m%d_%H%M')}"
-        status = await save_one_by_index(page, item.display_text, list_name, req.candidate_index)
+        status = await save_one_by_index(page, item.display_text, list_name, req.candidate_index, alias=item.alias)
         item.status = status
         return item.to_dict()
     finally:
