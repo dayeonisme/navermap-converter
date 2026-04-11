@@ -33,3 +33,31 @@ def test_인식불가_항목은_반환되지_않음():
     text = "1234 이상한 텍스트"
     results = extract_addresses(text, source_prefix="테스트")
     assert len(results) == 0
+
+def test_같은줄_앞_건물명_추출():
+    text = "판교타워 경기도 성남시 분당구 서현로 192"
+    items = extract_addresses(text, "테스트")
+    assert len(items) == 1
+    assert items[0].alias == "판교타워"
+
+def test_윗줄_건물명_추출():
+    text = "LH성남권주거복지지사\n경기도 성남시 분당구 서현로 192"
+    items = extract_addresses(text, "테스트")
+    assert len(items) == 1
+    assert items[0].alias == "LH성남권주거복지지사"
+
+def test_긴_텍스트는_건물명_아님():
+    # 30자 초과 → alias 없음
+    text = "이것은건물명이아니라아주긴일반텍스트입니다여기서끝나지않습니다 경기도 성남시 분당구 서현로 192"
+    items = extract_addresses(text, "테스트")
+    assert items[0].alias == ""
+
+def test_마침표_포함은_건물명_아님():
+    text = "입주자를 모집합니다. 경기도 성남시 분당구 서현로 192"
+    items = extract_addresses(text, "테스트")
+    assert items[0].alias == ""
+
+def test_건물명_없으면_빈문자열():
+    text = "경기도 성남시 분당구 서현로 192"
+    items = extract_addresses(text, "테스트")
+    assert items[0].alias == ""

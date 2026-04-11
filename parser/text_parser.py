@@ -20,7 +20,6 @@ _DOROMYEONG = re.compile(
 )
 
 # 지번 주소: 시도 시군구 [구] 읍면동 번지
-# 시군구 뒤에 선택적으로 구 단위가 올 수 있음 (예: 성남시 분당구 정자동)
 _JIBEON = re.compile(
     rf"({_SIDO})\s+"
     r"[\w가-힣]+[시군구]\s+"
@@ -28,6 +27,7 @@ _JIBEON = re.compile(
     r"[\w가-힣]+[읍면동리]\s+"
     r"\d+(?:-\d+)?"
 )
+
 
 def _normalize_addr(addr: str) -> str:
     """개행·연속 공백을 단일 공백으로 정규화."""
@@ -37,6 +37,44 @@ def _normalize_addr(addr: str) -> str:
 def _dedup_key(addr: str) -> str:
     """공백을 모두 제거한 중복 판별 키 (서현로 192 == 서현로192)."""
     return re.sub(r'\s', '', addr)
+
+
+def _is_valid_alias(candidate: str) -> bool:
+    """건물명으로 적합한지 판단."""
+    if not candidate or len(candidate) > 30:
+        return False
+    # 문장 종결 부호가 있으면 일반 문장으로 판단
+    if re.search(r'[.。!?]', candidate):
+        return False
+    # 숫자·기호·공백만이면 건물명 아님
+    if re.match(r'^[\d\s\-()①②③④⑤⑥⑦⑧⑨⑩.,:]+$', candidate):
+        return False
+    return True
+
+
+def _find_alias(text: str, match_start: int) -> str:
+    """주소 매칭 위치 앞에서 건물명 후보를 추출.
+    1순위: 같은 줄의 주소 앞 텍스트
+    2순위: 바로 윗 줄 전체
+    """
+    # 같은 줄에서 주소 앞 텍스트
+    line_start = text.rfind('\n', 0, match_start)
+    line_start = line_start + 1 if line_start >= 0 else 0
+    same_line_prefix = text[line_start:match_start].strip()
+
+    if _is_valid_alias(same_line_prefix):
+        return same_line_prefix
+
+    # 바로 윗 줄
+    if line_start > 0:
+        prev_line_end = line_start - 1  # 앞 \n 직전
+        prev_line_start = text.rfind('\n', 0, prev_line_end)
+        prev_line_start = prev_line_start + 1 if prev_line_start >= 0 else 0
+        prev_line = text[prev_line_start:prev_line_end].strip()
+        if _is_valid_alias(prev_line):
+            return prev_line
+
+    return ""
 
 
 def extract_addresses(text: str, source_prefix: str) -> List[AddressItem]:
@@ -50,10 +88,12 @@ def extract_addresses(text: str, source_prefix: str) -> List[AddressItem]:
             key = _dedup_key(addr)
             if key not in seen:
                 seen.add(key)
+                alias = _find_alias(text, match.start())
                 found.append(AddressItem(
                     raw_text=addr,
                     display_text=addr,
                     source_location=source_prefix,
+                    alias=alias,
                 ))
 
     return found
