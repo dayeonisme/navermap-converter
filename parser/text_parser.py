@@ -39,9 +39,9 @@ def _dedup_key(addr: str) -> str:
     return re.sub(r'\s', '', addr)
 
 
-# 앞뒤에서 제거할 기호 패턴 (원문자, 화살표, 불릿, 특수 마크 등)
-_SYMBOL_LEAD = re.compile(r'^[\s①②③④⑤⑥⑦⑧⑨⑩※→←↑↓⇒▶►▸◆◇●○■□△▲★☆•·▪\-–—＊]+')
-_SYMBOL_TRAIL = re.compile(r'[\s①②③④⑤⑥⑦⑧⑨⑩※→←↑↓⇒▶►▸◆◇●○■□△▲★☆•·▪\-–—＊]+$')
+# 앞뒤에서 제거할 기호 패턴 (원문자, 화살표, 불릿, 특수 마크, 콜론 등)
+_SYMBOL_LEAD = re.compile(r'^[\s①②③④⑤⑥⑦⑧⑨⑩※→←↑↓⇒▶►▸◆◇●○■□△▲★☆•·▪\-–—＊:：]+')
+_SYMBOL_TRAIL = re.compile(r'[\s①②③④⑤⑥⑦⑧⑨⑩※→←↑↓⇒▶►▸◆◇●○■□△▲★☆•·▪\-–—＊:：]+$')
 
 # 한국어 서술형 어미 — 문장 끝이면 건물명이 아님
 _VERB_ENDING = re.compile(
@@ -69,6 +69,10 @@ def _is_valid_alias(candidate: str) -> bool:
         return False
     # 서술형 동사 어미로 끝나면 문장으로 판단
     if _VERB_ENDING.search(candidate):
+        return False
+    # 공백으로 분리했을 때 모든 토큰이 1자이면 PDF 폼 라벨로 판단 (예: '주 소', '성 명')
+    tokens = candidate.split()
+    if tokens and all(len(t) == 1 for t in tokens):
         return False
     return True
 

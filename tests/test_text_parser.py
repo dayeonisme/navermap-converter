@@ -96,3 +96,20 @@ def test_기호_제거후_너무_짧으면_건물명_아님():
     text = "① A 경기도 성남시 분당구 서현로 192"
     items = extract_addresses(text, "테스트")
     assert items[0].alias == ""
+
+def test_후행_콜론_제거():
+    # "판교제2테크노밸리A1 :" → "판교제2테크노밸리A1"
+    text = "판교제2테크노밸리A1 :\n경기도 성남시 분당구 서현로 192"
+    items = extract_addresses(text, "테스트")
+    assert items[0].alias == "판교제2테크노밸리A1"
+
+def test_폼_라벨_한글자씩_공백_구분은_건물명_아님():
+    # PDF 폼 라벨: "주 소 :" → 각 토큰이 1자 → 건물명 아님
+    text = "주 소 :\n경기도 성남시 분당구 서현로 192"
+    items = extract_addresses(text, "테스트")
+    assert items[0].alias == ""
+
+def test_폼_라벨_성명도_건물명_아님():
+    text = "성 명 :\n경기도 성남시 분당구 서현로 192"
+    items = extract_addresses(text, "테스트")
+    assert items[0].alias == ""
