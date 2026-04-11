@@ -9,7 +9,7 @@
 #
 # CSS Module 해시(UEzoS, TYaxT, VLTHu, YwYLL 등)는 네이버 배포 시 변경될 수 있음.
 # UI 깨지면 이 파일부터 확인. swt-* 클래스는 디자인 시스템 클래스로 상대적으로 안정적.
-# 마지막 검증일: 2026-04-05 (btn_favorite /address/ 저장 경로 확인)
+# 마지막 검증일: 2026-04-05 (btn_favorite /address/ 저장 경로 확인) | 별명 선택자 미검증 — 실제 UI 확인 필요
 
 # URLs
 MAP_URL = "https://map.naver.com/p/"
@@ -33,6 +33,10 @@ ENTRY_IFRAME = "entryIframe"
 PLACE_SAVE_BUTTON = "a.D_Xqt[aria-pressed]"
 PLACE_SAVE_LIST_ITEM = "button.swt-save-group-info"  # 리스트 선택 항목 (entryIframe 및 메인 DOM 공용)
 PLACE_SAVE_CONFIRM = "button.swt-save-btn"  # 저장 확인 버튼
+
+# 별명 입력 (저장 다이얼로그 내 — 리스트 선택 후 노출)
+PLACE_SAVE_MEMO_BTN = "button:has-text('메모,별명')"   # '+ 메모,별명,URL 추가' 버튼
+PLACE_SAVE_ALIAS_INPUT = "input.swt-input-text"        # 별명 입력란 (리스트명 input과 동일 클래스, 다이얼로그 컨텍스트에서 2번째)
 
 # 주소 저장 (/address/ 페이지 — 메인 DOM에 렌더링, entryIframe 없음)
 ADDRESS_SAVE_BUTTON = "button.btn_favorite"  # 주소 카드의 저장 버튼
