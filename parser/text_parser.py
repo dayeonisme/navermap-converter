@@ -15,7 +15,7 @@ _DOROMYEONG = re.compile(
     rf"({_SIDO})\s+"
     r"[\w가-힣]+[시군구]\s+"
     r"(?:[\w가-힣]+[구]\s+)?"
-    r"[\w가-힣]+[로길]\s+"
+    r"[\w가-힣]+[로길]\s*"
     r"\d+(?:-\d+)?(?:\s+[\w가-힣\d]+동)?"
 )
 
@@ -29,16 +29,27 @@ _JIBEON = re.compile(
     r"\d+(?:-\d+)?"
 )
 
+def _normalize_addr(addr: str) -> str:
+    """개행·연속 공백을 단일 공백으로 정규화."""
+    return re.sub(r'\s+', ' ', addr).strip()
+
+
+def _dedup_key(addr: str) -> str:
+    """공백을 모두 제거한 중복 판별 키 (서현로 192 == 서현로192)."""
+    return re.sub(r'\s', '', addr)
+
+
 def extract_addresses(text: str, source_prefix: str) -> List[AddressItem]:
     """텍스트에서 한국 주소(도로명+지번)를 추출하여 AddressItem 목록 반환."""
     found = []
-    seen = set()
+    seen: set[str] = set()
 
     for pattern in (_DOROMYEONG, _JIBEON):
         for match in pattern.finditer(text):
-            addr = match.group(0).strip()
-            if addr not in seen:
-                seen.add(addr)
+            addr = _normalize_addr(match.group(0))
+            key = _dedup_key(addr)
+            if key not in seen:
+                seen.add(key)
                 found.append(AddressItem(
                     raw_text=addr,
                     display_text=addr,

@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List
 import pdfplumber
 from models import AddressItem
-from parser.text_parser import extract_addresses
+from parser.text_parser import extract_addresses, _dedup_key
 
 def _ocr_page(page) -> str:
     """pdfplumber 페이지를 이미지로 변환 후 OCR."""
@@ -45,4 +45,12 @@ def parse_pdf(path: Path) -> List[AddressItem]:
 
             items.extend(extract_addresses(text, source_prefix=source))
 
-    return items
+    # 페이지 간 중복 제거 (공백 차이 무시)
+    seen: set[str] = set()
+    deduped: List[AddressItem] = []
+    for item in items:
+        key = _dedup_key(item.display_text)
+        if key not in seen:
+            seen.add(key)
+            deduped.append(item)
+    return deduped
