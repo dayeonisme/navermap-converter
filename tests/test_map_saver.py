@@ -202,7 +202,9 @@ async def test_save_in_entry_frame_별명_입력():
         result = await _save_in_entry_frame(page, "AUTO_20260405", alias="판교타워")
 
     assert result is True
-    entry_frame.fill.assert_called_once()
+    entry_frame.fill.assert_called_once_with(
+        "input[placeholder='지도 위에 표시될 별명을 남겨주세요.']", "판교타워"
+    )
 
 
 @pytest.mark.asyncio
