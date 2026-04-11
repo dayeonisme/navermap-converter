@@ -113,3 +113,21 @@ def test_폼_라벨_성명도_건물명_아님():
     text = "성 명 :\n경기도 성남시 분당구 서현로 192"
     items = extract_addresses(text, "테스트")
     assert items[0].alias == ""
+
+def test_도로명주소_건물명_아님():
+    # 폼 라벨 "도로명주소(" → 장소 유형 키워드 없음 → 별명 아님
+    text = "도로명주소(\n경기도 성남시 분당구 서현로 192"
+    items = extract_addresses(text, "테스트")
+    assert items[0].alias == ""
+
+def test_장소_유형_키워드_없으면_건물명_아님():
+    # "접수처" 같은 단어는 장소 유형 키워드 없음
+    text = "접수처\n경기도 성남시 분당구 서현로 192"
+    items = extract_addresses(text, "테스트")
+    assert items[0].alias == ""
+
+def test_테크노밸리_섹션코드_포함_건물명():
+    # "판교제2테크노밸리A1" — 테크노밸리 키워드 포함
+    text = "판교제2테크노밸리A1\n경기도 성남시 분당구 서현로 192"
+    items = extract_addresses(text, "테스트")
+    assert items[0].alias == "판교제2테크노밸리A1"
