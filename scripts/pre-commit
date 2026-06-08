@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Pre-commit hook: block secrets and sensitive files.
+# Install: ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
+
+set -euo pipefail
+
+FAIL=0
+
+red() { printf '\033[31m%s\033[0m\n' "$*"; }
+
+STAGED=$(git diff --cached --name-only)
+
+# ── 1. Block specific sensitive files ─────────────────────────────────────────
+if echo "$STAGED" | grep -qE '^sessions/'; then
+    red "BLOCKED: sessions/ contains Naver login cookies and must not be committed."
+    FAIL=1
+fi
+
+BLOCKED_FILES=(".env")
+for f in "${BLOCKED_FILES[@]}"; do
+    if echo "$STAGED" | grep -qF "$f"; then
+        red "BLOCKED FILE: $f contains credentials and must not be committed."
+        FAIL=1
+    fi
+done
+
+# ── 2. Scan diff for secrets (exclude hook script itself) ─────────────────────
+DIFF=$(git diff --cached -- ':!scripts/pre-commit')
+
+check_pattern() {
+    local label="$1"
+    local pattern="$2"
+    if echo "$DIFF" | grep -qE "^\+.*${pattern}"; then
+        red "SENSITIVE DATA: $label detected in staged changes."
+        FAIL=1
+    fi
+}
+
+check_pattern "API key value"      '(API_KEY|BOT_TOKEN|ACCESS_TOKEN)=[A-Za-z0-9_-]{20,}'
+check_pattern "Naver cookie value" '"NID_AUT"\s*:\s*"[A-Za-z0-9]+'
+
+REAL_PATH='\/Users\/dayeon\.'
+check_pattern "real home path"     "$REAL_PATH"
+
+REAL_NAME='PRIVATE_NAME'
+check_pattern "real name"          "$REAL_NAME"
+
+# ── 3. Report ──────────────────────────────────────────────────────────────────
+if [[ $FAIL -eq 1 ]]; then
+    echo ""
+    red "Commit blocked. Remove the items above before committing."
+    echo "If a match is a false positive, check scripts/pre-commit to refine the pattern."
+    exit 1
+fi
+
+exit 0
