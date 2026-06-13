@@ -65,6 +65,22 @@ python main.py
 
 브라우저에서 `http://localhost:8000` 접속.
 
+#### macOS: 더블클릭 런처 (선택)
+
+매번 터미널에서 `python main.py`를 치기 번거로우면 토글 앱을 빌드한다.
+
+```bash
+bash launcher/build.sh    # 저장소 루트에 NaverMap.app 생성
+```
+
+- **NaverMap** 더블클릭 → 서버 켜짐(Terminal 창에 로그 표시) + 브라우저 자동 오픈
+- 다시 더블클릭 → 서버 꺼짐 + 창 닫힘 (켜짐 ↔ 꺼짐 토글)
+- Terminal 창 존재 여부 = 서버 실행 중 여부
+- Dock 고정: `NaverMap.app`을 Dock(구분선 왼쪽)으로 드래그
+- 첫 실행 시 macOS가 "Terminal 제어" 권한을 물으면 허용
+
+> `NaverMap.app`은 빌드 산출물이라 git에 포함하지 않는다 — `launcher/`의 소스로 언제든 재생성.
+
 ### 4. 테스트 실행
 
 ```bash
@@ -93,6 +109,11 @@ navermap_converter/
 │   └── map_saver.py         # 네이버 지도 리스트 생성 + 장소 저장 자동화
 ├── static/
 │   └── index.html           # 단일 페이지 웹 UI
+├── launcher/                # macOS 더블클릭 런처 (build.sh → NaverMap.app)
+│   ├── build.sh             # 빌드: applescript 컴파일 + 아이콘 적용
+│   ├── NaverMap.applescript # 토글 런처 소스 (서버 켜짐 ↔ 꺼짐)
+│   ├── make_icon.py         # 앱 아이콘(네이버 그린 + 위치 핀) 생성
+│   └── seticon.swift        # 커스텀 아이콘 주입 (캐시 무시)
 ├── tests/
 │   ├── test_models.py
 │   ├── test_text_parser.py
