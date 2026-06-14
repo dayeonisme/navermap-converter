@@ -79,6 +79,8 @@ bash launcher/build.sh    # 저장소 루트에 NaverMap.app 생성
 - Dock 고정: `NaverMap.app`을 Dock(구분선 왼쪽)으로 드래그
 - 첫 실행 시 macOS가 "Terminal 제어" 권한을 물으면 허용
 
+> **끄기는 아이콘을 다시 클릭**한다 (경고창 없이 종료 + 창 닫힘). Terminal 창을 빨간 버튼/⌘W로 직접 닫으면 "실행 중 프로세스 종료" 확인창이 뜰 수 있다 — 이는 Terminal 기본 동작이며, 끄려면 Terminal ▸ 설정 ▸ 프로파일 ▸ (사용 중인 프로파일) ▸ 셸 ▸ "종료 전 확인 → 없음"으로 변경.
+
 > `NaverMap.app`은 빌드 산출물이라 git에 포함하지 않는다 — `launcher/`의 소스로 언제든 재생성.
 
 ### 4. 테스트 실행
