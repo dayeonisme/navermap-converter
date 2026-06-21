@@ -36,11 +36,8 @@ check_pattern() {
     fi
 }
 
-REAL_NAME='PRIVATE_NAME'
 
 check_pattern "local home path" '(/Users/[^[:space:]"'"'"']+|C:\\Users\\[^[:space:]\\]+)'
-check_pattern "local username" 'private-user-pattern'
-check_pattern "real name" "$REAL_NAME"
 check_pattern "private housing-project reference" '(apply[[:space:]_-]*home[[:space:]_-]*watch|Apply(Home)?/LH|LH[[:space:]]+subscription)'
 check_pattern "Telegram bot token" '[0-9]{8,}:[A-Za-z0-9_-]{20,}'
 check_pattern "Telegram chat id" 'TELEGRAM_CHAT_ID[^[:space:]]*[[:space:]]*[=:][^[:space:]]*[1-9][0-9]{6,}'
@@ -49,6 +46,11 @@ check_pattern "lottery account id" 'DHLOTTERY_ID[[:space:]]*=[[:space:]]*[^<y[:s
 check_pattern "WatchaPedia user URL" 'pedia[.]watcha[.]com/.*/users/[A-Za-z0-9_-]{6,}'
 check_pattern "generic API key or token" '(API_KEY|BOT_TOKEN|ACCESS_TOKEN|SECRET_KEY|CLIENT_SECRET)[[:space:]]*=[[:space:]]*["'"'"']?[A-Za-z0-9_./+-]{35,}'
 check_pattern "private key" '"private_key"[[:space:]]*:[[:space:]]*"-----BEGIN'
+
+while IFS= read -r pattern; do
+    [ -z "$pattern" ] && continue
+    check_pattern "local privacy pattern" "$pattern"
+done < <(git config --local --get-all cinelog.privacyPattern || true)
 
 if [[ $FAIL -eq 1 ]]; then
     echo ""
