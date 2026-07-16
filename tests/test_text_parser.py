@@ -131,3 +131,34 @@ def test_테크노밸리_섹션코드_포함_건물명():
     text = "판교제2테크노밸리A1\n경기도 성남시 분당구 서현로 192"
     items = extract_addresses(text, "테스트")
     assert items[0].alias == "판교제2테크노밸리A1"
+
+
+def test_시도_축약형_지번주소_여러개_추출():
+    text = (
+        "서울 종로구 필운동 202\n"
+        "서울 종로구 화동 138-21\n"
+        "서울 마포구 상암동 33-4"
+    )
+    results = extract_addresses(text, source_prefix="직접입력")
+
+    assert [item.display_text for item in results] == [
+        "서울 종로구 필운동 202",
+        "서울 종로구 화동 138-21",
+        "서울 마포구 상암동 33-4",
+    ]
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "서울특별시 강남구 역삼동 1-1",
+        "서울 강남구 역삼동 1-1",
+        "경기도 성남시 분당구 정자동 6-1",
+        "경기 성남시 분당구 정자동 6-1",
+        "제주특별자치도 제주시 연동 1-1",
+        "제주 제주시 연동 1-1",
+    ],
+)
+def test_시도_공식명칭과_축약형_모두_추출(address):
+    results = extract_addresses(address, source_prefix="테스트")
+    assert [item.display_text for item in results] == [address]

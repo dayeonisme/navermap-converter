@@ -79,6 +79,18 @@ def test_resolve_409_작업중():
     del main._item_registry[item.id]
 
 
+def test_parse_text_서울_축약형_지번주소_세개_반환():
+    text = (
+        "서울 종로구 필운동 202\n"
+        "서울 종로구 화동 138-21\n"
+        "서울 마포구 상암동 33-4"
+    )
+    response = client.post("/parse-text", json={"text": text})
+
+    assert response.status_code == 200
+    assert [item["display_text"] for item in response.json()["addresses"]] == text.splitlines()
+
+
 def test_resolve_성공():
     from models import AddressItem
     from unittest.mock import AsyncMock, patch
