@@ -137,6 +137,11 @@ def _read_cookies(db_path: str, aes_key: bytes) -> List[dict]:
     from cryptography.hazmat.backends import default_backend
 
     conn = sqlite3.connect(db_path)
+    try:
+        version_row = conn.execute("SELECT value FROM meta WHERE key = 'version'").fetchone()
+        db_version = int(version_row[0]) if version_row else 0
+    except (sqlite3.Error, TypeError, ValueError):
+        db_version = 0
     rows = conn.execute(
         "SELECT name, value, host_key, path, is_secure, encrypted_value "
         "FROM cookies WHERE host_key LIKE '%naver.com'"
@@ -145,6 +150,7 @@ def _read_cookies(db_path: str, aes_key: bytes) -> List[dict]:
 
     cookies = []
     for name, value, host, path, is_secure, enc_value in rows:
+        payload = None
         if enc_value and enc_value[:3] == b"v10":
             try:
                 # macOS/Linux Chrome: AES-128-CBC, IV = 0x20 * 16, PKCS7 패딩
@@ -156,7 +162,9 @@ def _read_cookies(db_path: str, aes_key: bytes) -> List[dict]:
                 dec = cipher.decryptor()
                 raw = dec.update(enc_value[3:]) + dec.finalize()
                 pad = raw[-1]
-                value = raw[:-pad].decode("utf-8", errors="ignore")
+                if pad < 1 or pad > 16:
+                    continue
+                payload = raw[:-pad]
             except Exception:
                 continue
         elif enc_value and enc_value[:3] == b"v20":
@@ -167,9 +175,17 @@ def _read_cookies(db_path: str, aes_key: bytes) -> List[dict]:
                 nonce = enc_value[3:15]
                 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
                 aesgcm = AESGCM(aes_key)
-                value = aesgcm.decrypt(nonce, enc_value[15:], None).decode("utf-8", errors="ignore")
+                payload = aesgcm.decrypt(nonce, enc_value[15:], None)
             except Exception:
                 continue
+
+        if payload is not None:
+            if db_version >= 24:
+                host_hash = hashlib.sha256(host.encode("utf-8")).digest()
+                if not payload.startswith(host_hash):
+                    continue
+                payload = payload[len(host_hash):]
+            value = payload.decode("utf-8", errors="ignore")
 
         if not value:
             continue
