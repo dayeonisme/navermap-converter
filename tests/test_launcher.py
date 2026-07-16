@@ -1,4 +1,6 @@
 from pathlib import Path
+import subprocess
+import tempfile
 import unittest
 
 
@@ -16,3 +18,14 @@ class LauncherSourceTests(unittest.TestCase):
         source = SCRIPT.read_text()
         self.assertIn('sessions of w', source)
         self.assertIn('(tty of s) is theTTY', source)
+
+    def test_source_compiles(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "NaverMap.app"
+            result = subprocess.run(
+                ["osacompile", "-o", str(output), str(SCRIPT)],
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
