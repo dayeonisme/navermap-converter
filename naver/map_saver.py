@@ -245,14 +245,8 @@ async def _save_one(page, address: str, list_name: str, alias: str = "") -> dict
 
         # /address/ 리다이렉트 → 단일 주소 결과 직접 표시 (메인 프레임에 렌더링, iframe 없음)
         if "/address/" in page.url:
-            # 이 주소의 장소 섹션에 장소가 있으면 첫 번째 장소를 entryIframe으로 저장
-            place_result = await _try_address_place(page, list_name, alias=alias)
-            if place_result is None:
-                # 장소 섹션 없음 → 주소 자체를 리스트에 저장
-                success = await _save_address_page(page, list_name, alias=alias)
-            else:
-                # 장소 클릭 후 결과 (페이지 이미 이동됨 — address 저장 불가)
-                success = place_result
+            # 주소 자체를 저장한다. 주변 장소로 이동하면 현재 장소 상세 UI에 저장 버튼이 없어 실패한다.
+            success = await _save_address_page(page, list_name, alias=alias)
             return {"status": "success" if success else "failed", "candidates": []}
 
         # searchIframe 콘텐츠 로드 대기 (최대 10초)

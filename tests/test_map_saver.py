@@ -92,6 +92,27 @@ async def test_save_one_entry_frame_저장실패_failed():
 
 
 @pytest.mark.asyncio
+async def test_save_one_주소결과는_주변장소없이_주소자체를_저장():
+    from naver import map_saver
+
+    page = AsyncMock()
+    page.url = "https://map.naver.com/p/search/x/address/example"
+    save_address = AsyncMock(return_value=True)
+
+    with patch("naver.map_saver._save_address_page", new=save_address), \
+         patch(
+             "naver.map_saver._try_address_place",
+             new=AsyncMock(side_effect=AssertionError("주변 장소를 열면 안 됩니다")),
+         ):
+        result = await map_saver._save_one(
+            page, "서울 종로구 필운동 202", "검증 리스트"
+        )
+
+    assert result == {"status": "success", "candidates": []}
+    save_address.assert_awaited_once_with(page, "검증 리스트", alias="")
+
+
+@pytest.mark.asyncio
 async def test_save_in_entry_frame_리스트없음_failed():
     from naver.map_saver import _save_in_entry_frame
 
