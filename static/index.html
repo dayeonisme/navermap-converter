@@ -154,9 +154,26 @@
   async function parseText() {
     const text = document.getElementById('textInput').value.trim();
     if (!text) return;
-    const res = await fetch('/parse-text', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({text}) });
-    const data = await res.json();
-    setAddresses(data.addresses);
+    try {
+      const res = await fetch('/parse-text', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({text})
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        alert('주소 추출 실패: ' + (error.detail || `HTTP ${res.status}`));
+        return;
+      }
+      const data = await res.json();
+      if (!data.addresses.length) {
+        alert('인식된 주소가 없습니다. 시·군·구와 번지를 포함해 입력해 주세요.');
+        return;
+      }
+      setAddresses(data.addresses);
+    } catch (e) {
+      alert('오류: ' + e.message);
+    }
   }
 
   function setAddresses(items) {

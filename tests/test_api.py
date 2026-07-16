@@ -91,6 +91,16 @@ def test_parse_text_서울_축약형_지번주소_세개_반환():
     assert [item["display_text"] for item in response.json()["addresses"]] == text.splitlines()
 
 
+def test_index_직접입력_빈결과와_오류_안내_포함():
+    response = client.get("/")
+
+    assert response.status_code == 200
+    html = response.text
+    assert "인식된 주소가 없습니다. 시·군·구와 번지를 포함해 입력해 주세요." in html
+    assert "if (!res.ok)" in html
+    assert "catch (e)" in html
+
+
 def test_resolve_성공():
     from models import AddressItem
     from unittest.mock import AsyncMock, patch
