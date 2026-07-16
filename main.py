@@ -39,6 +39,7 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 # _job_active: bool flag to prevent concurrent save jobs (using Lock.locked() has TOCTOU race)
 _job_active: bool = False
 _job_cancelled: bool = False
+_job_task: asyncio.Task | None = None
 _browser: Optional[NaverBrowser] = None
 _progress_queue: asyncio.Queue | None = None
 _item_registry: dict[str, AddressItem] = {}  # id -> AddressItem
@@ -123,13 +124,13 @@ class RetryRequest(BaseModel):
 
 @app.post("/save", status_code=202)
 async def save_addresses(req: SaveRequest):
-    global _job_active, _job_cancelled, _progress_queue
+    global _job_active, _job_cancelled, _job_task, _progress_queue
     if _job_active:
         raise HTTPException(status_code=409, detail="이미 저장 작업이 진행 중입니다")
     _progress_queue = asyncio.Queue()
     _job_cancelled = False
     _job_active = True  # Set synchronously before create_task to prevent race
-    asyncio.create_task(_run_save(req.addresses, req.list_name or None))
+    _job_task = asyncio.create_task(_run_save(req.addresses, req.list_name or None))
     return {"status": "accepted"}
 
 
@@ -139,6 +140,8 @@ async def cancel_job():
     if not _job_active:
         raise HTTPException(status_code=404, detail="진행 중인 작업이 없습니다")
     _job_cancelled = True
+    if _job_task is not None and not _job_task.done():
+        _job_task.cancel()
     return {"status": "cancelling"}
 
 
@@ -174,7 +177,7 @@ async def resolve_ambiguous(item_id: str, req: ResolveRequest):
 
 @app.post("/retry", status_code=202)
 async def retry_addresses(req: RetryRequest):
-    global _job_active, _job_cancelled, _progress_queue
+    global _job_active, _job_cancelled, _job_task, _progress_queue
     if _job_active:
         raise HTTPException(status_code=409, detail="이미 저장 작업이 진행 중입니다")
 
@@ -193,7 +196,7 @@ async def retry_addresses(req: RetryRequest):
     _progress_queue = asyncio.Queue()
     _job_cancelled = False
     _job_active = True
-    asyncio.create_task(_run_save(items, _current_list_name))
+    _job_task = asyncio.create_task(_run_save(items, _current_list_name))
     return {"status": "accepted"}
 
 
@@ -218,12 +221,12 @@ async def _stream_progress() -> AsyncGenerator[str, None]:
     while True:
         event = await _progress_queue.get()
         yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-        if event.get("type") == "done":
+        if event.get("type") in {"done", "cancelled"}:
             break
 
 
 async def _run_save(address_dicts: list, list_name_override: Optional[str] = None):
-    global _job_active, _job_cancelled, _current_list_name
+    global _job_active, _job_cancelled, _job_task, _current_list_name
 
     try:
         from datetime import datetime
@@ -291,8 +294,12 @@ async def _run_save(address_dicts: list, list_name_override: Optional[str] = Non
             # done 이벤트 전송 후 headed 브라우저로 저장된 리스트 열기
             from naver.map_saver import _navigate_to_list
             await _navigate_to_list(list_name)
+    except asyncio.CancelledError:
+        if _progress_queue is not None:
+            await _progress_queue.put({"type": "cancelled"})
     finally:
-        _job_active = False  # Always clear flag on completion or error
+        _job_active = False
+        _job_task = None
 
 # ── Static files ──────────────────────────────────────────────
 

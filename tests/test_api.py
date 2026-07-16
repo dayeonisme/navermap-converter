@@ -1,7 +1,9 @@
 # tests/test_api.py
+import asyncio
 import io
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, MagicMock, patch
 from main import app
 
 client = TestClient(app)
@@ -137,3 +139,102 @@ def test_retry_422_ambiguous_id():
     assert response.status_code == 422
     # Clean up
     del main._item_registry[item.id]
+
+
+@pytest.mark.asyncio
+async def test_cancel_job_실행중_task_cancel_호출():
+    import main
+
+    task = MagicMock()
+    task.done.return_value = False
+    main._job_active = True
+    main._job_cancelled = False
+    main._job_task = task
+    try:
+        result = await main.cancel_job()
+
+        assert result == {"status": "cancelling"}
+        assert main._job_cancelled is True
+        task.cancel.assert_called_once_with()
+    finally:
+        main._job_active = False
+        main._job_cancelled = False
+        main._job_task = None
+
+
+@pytest.mark.asyncio
+async def test_save_addresses_생성한_task_참조_보관():
+    import main
+
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def blocked_save(*_args):
+        started.set()
+        await release.wait()
+
+    main._job_active = False
+    main._job_task = None
+    created_task = None
+    original_create_task = asyncio.create_task
+
+    def track_task(coro):
+        nonlocal created_task
+        created_task = original_create_task(coro)
+        return created_task
+
+    try:
+        with patch("main._run_save", side_effect=blocked_save), \
+             patch("main.asyncio.create_task", side_effect=track_task):
+            result = await main.save_addresses(main.SaveRequest(addresses=[]))
+            await started.wait()
+            task = main._job_task
+
+            assert result == {"status": "accepted"}
+            assert isinstance(task, asyncio.Task)
+    finally:
+        release.set()
+        if created_task is not None:
+            await created_task
+        main._job_active = False
+        main._job_task = None
+
+
+@pytest.mark.asyncio
+async def test_run_save_대기중_cancelled_event와_상태정리():
+    import main
+
+    entered = asyncio.Event()
+
+    async def wait_forever():
+        entered.set()
+        await asyncio.Event().wait()
+
+    browser = MagicMock()
+    browser.is_logged_in = AsyncMock(side_effect=wait_forever)
+    main._progress_queue = asyncio.Queue()
+    main._job_active = True
+
+    with patch("main.get_browser", return_value=browser):
+        task = asyncio.create_task(main._run_save([], None))
+        main._job_task = task
+        await entered.wait()
+        task.cancel()
+        await task
+
+    assert main._job_active is False
+    assert main._job_task is None
+    assert await main._progress_queue.get() == {"type": "cancelled"}
+
+
+@pytest.mark.asyncio
+async def test_stream_progress_cancelled에서_종료():
+    import main
+
+    main._progress_queue = asyncio.Queue()
+    await main._progress_queue.put({"type": "cancelled"})
+    stream = main._stream_progress()
+
+    assert "cancelled" in await stream.__anext__()
+    with pytest.raises(StopAsyncIteration):
+        await asyncio.wait_for(stream.__anext__(), timeout=0.1)
