@@ -4,18 +4,35 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import time
 from pathlib import Path
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
 COOKIES_PATH = Path(__file__).parent.parent / "sessions" / "naver_cookies.json"
 NAVER_MAIN = "https://www.naver.com"
-LOGIN_COOKIE = "NID_AUT"
+LOGIN_COOKIES = {"NID_AUT", "NID_SES"}
 POLL_INTERVAL = 2  # seconds
 
 # Playwright add_cookies에서 허용하는 필드만 남김 (Chrome 전용 필드 제거)
 _COOKIE_FIELDS = {"name", "value", "url", "domain", "path", "expires", "httpOnly", "secure", "sameSite"}
 # sameSite에 허용되는 값 (Playwright CDP 스펙)
 _VALID_SAMESITE = {"Strict", "Lax", "None"}
+
+
+def _has_valid_login_cookies(cookies: list, now: float | None = None) -> bool:
+    current_time = time.time() if now is None else now
+    cookies_by_name = {
+        cookie.get("name"): cookie
+        for cookie in cookies
+        if cookie.get("name") in LOGIN_COOKIES and cookie.get("value")
+    }
+    if set(cookies_by_name) != LOGIN_COOKIES:
+        return False
+    for cookie in cookies_by_name.values():
+        expires = cookie.get("expires", -1)
+        if expires not in (-1, None) and expires < current_time:
+            return False
+    return True
 
 
 def _sanitize_cookies(cookies: list) -> list:
@@ -79,27 +96,19 @@ class NaverBrowser:
         return await self._context.new_page()
 
     async def is_logged_in(self) -> bool:
-        """Check login state: NID_AUT cookie must exist and not be expired."""
+        """필수 로그인 쿠키가 모두 존재하고 유효한지 확인."""
         await self.start()
-        import time
         cookies = await self._context.cookies()
-        for c in cookies:
-            if c["name"] == LOGIN_COOKIE:
-                expires = c.get("expires", -1)
-                if expires != -1 and expires < time.time():
-                    return False
-                return True
-        return False
+        return _has_valid_login_cookies(cookies)
 
     async def try_import_chrome_session(self) -> bool:
-        """Chrome에서 Naver 쿠키를 읽어 세션에 추가. NID_AUT가 있으면 True 반환."""
+        """Chrome에서 유효한 필수 Naver 로그인 쿠키를 읽어 세션에 추가."""
         try:
             from naver.chrome_cookies import get_naver_cookies_from_chrome
             chrome_cookies = get_naver_cookies_from_chrome()
             if not chrome_cookies:
                 return False
-            has_auth = any(c["name"] == LOGIN_COOKIE for c in chrome_cookies)
-            if not has_auth:
+            if not _has_valid_login_cookies(chrome_cookies):
                 return False
             await self.start()
             # 쿠키를 개별로 추가 — 일부 쿠키가 invalid 필드를 갖더라도 나머지를 로드
@@ -123,12 +132,12 @@ class NaverBrowser:
             return False
 
     async def wait_for_login(self, timeout: int = 120) -> bool:
-        """Wait for user to manually log in by polling NID_AUT cookie."""
+        """필수 로그인 쿠키 쌍을 폴링하며 수동 로그인을 기다림."""
         await self._page.goto(NAVER_MAIN)
         elapsed = 0
         while elapsed < timeout:
             cookies = await self._context.cookies()
-            if any(c["name"] == LOGIN_COOKIE for c in cookies):
+            if _has_valid_login_cookies(cookies):
                 await self._save_cookies()
                 return True
             await asyncio.sleep(POLL_INTERVAL)
