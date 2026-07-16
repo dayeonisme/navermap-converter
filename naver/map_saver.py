@@ -97,6 +97,8 @@ async def _create_list(page, list_name: str) -> None:
     except RuntimeError:
         raise
     except Exception as e:
+        if "nidlogin" in page.url:
+            raise RuntimeError("SESSION_EXPIRED") from e
         await _screenshot(page, f"create_list_fail_{step}")
         raise RuntimeError(f"리스트 생성 실패 [{step}]: {e}")
 

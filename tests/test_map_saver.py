@@ -1,7 +1,7 @@
 # tests/test_map_saver.py
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, PropertyMock, patch
 
 
 @pytest.mark.asyncio
@@ -223,3 +223,45 @@ async def test_save_in_entry_frame_별명_없으면_fill_안호출():
 
     assert result is True
     entry_frame.fill.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_create_list_frame_detached_로그인리다이렉트_session_expired():
+    from naver.map_saver import _create_list
+    from naver import selectors as S
+
+    page = AsyncMock()
+    frame = AsyncMock()
+    frame.query_selector_all = AsyncMock(return_value=[])
+    frame.click = AsyncMock(side_effect=Exception("Frame was detached"))
+    type(page).url = PropertyMock(side_effect=[
+        S.MAP_URL,
+        S.MAP_URL,
+        S.MAP_URL,
+        "https://nid.naver.com/nidlogin.login",
+    ])
+
+    with patch("naver.map_saver._get_my_place_frame", return_value=frame), \
+         patch("naver.map_saver._screenshot", new=AsyncMock()):
+        with pytest.raises(RuntimeError, match="^SESSION_EXPIRED$"):
+            await _create_list(page, "Auto_20260716_1558")
+
+
+@pytest.mark.asyncio
+async def test_create_list_frame_error_로그인아니면_단계오류_유지():
+    from naver.map_saver import _create_list
+    from naver import selectors as S
+
+    page = AsyncMock()
+    page.url = S.MAP_URL
+    frame = AsyncMock()
+    frame.query_selector_all = AsyncMock(return_value=[])
+    frame.click = AsyncMock(side_effect=Exception("selector missing"))
+
+    with patch("naver.map_saver._get_my_place_frame", return_value=frame), \
+         patch("naver.map_saver._screenshot", new=AsyncMock()):
+        with pytest.raises(
+            RuntimeError,
+            match=r"리스트 생성 실패 \[create_list_button\]: selector missing",
+        ):
+            await _create_list(page, "Auto_20260716_1558")
