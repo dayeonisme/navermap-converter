@@ -23,7 +23,7 @@ PDF·엑셀·텍스트 파일에서 한국 주소를 추출하고, 네이버 지
 | 항목 | 내용 |
 |------|------|
 | **실제 UI 동작 테스트** | `naver/selectors.py`의 CSS 선택자가 현재 네이버 지도 UI와 일치하는지 실제 브라우저로 검증 필요 (네이버가 UI를 변경했을 가능성 있음) |
-| **`pdf2image` 누락** | `requirements.txt`에 `pdf2image`가 없음. OCR 폴백 사용 시 필요 → `pip install pdf2image` 후 `requirements.txt`에 추가 |
+| **`pdf2image` 누락** | `pyproject.toml`에 `pdf2image`가 없음. OCR 폴백 사용 시 필요 → `uv add pdf2image` |
 | **Tesseract 설치** | OCR 기능을 쓰려면 시스템에 Tesseract와 `kor.traineddata`를 별도 설치해야 함 (아래 가이드 참고) |
 | **ambiguous 수동 처리 UI** | 검색 결과가 복수인 경우 UI에서 수동 선택하는 기능 미구현 (현재는 목록에 `ambiguous`로 표시만 함) |
 
@@ -34,6 +34,7 @@ PDF·엑셀·텍스트 파일에서 한국 주소를 추출하고, 네이버 지
 ### 1. 사전 요구사항
 
 - Python 3.10 이상
+- [uv](https://docs.astral.sh/uv/) (패키지 관리)
 - Tesseract OCR (OCR 폴백 필요 시)
 
   **Windows:**
@@ -49,18 +50,17 @@ PDF·엑셀·텍스트 파일에서 한국 주소를 추출하고, 네이버 지
 git clone <repo-url>
 cd navermap_converter
 
-# 패키지 설치
-pip install -r requirements.txt
-pip install pdf2image   # requirements.txt에 아직 미포함, 별도 설치 필요
+# 패키지 설치 (uv가 가상환경 자동 생성)
+uv sync
 
 # Playwright 브라우저 설치
-playwright install chromium
+uv run playwright install chromium
 ```
 
 ### 3. 실행
 
 ```bash
-python main.py
+uv run main.py
 ```
 
 브라우저에서 `http://localhost:8000` 접속.
@@ -86,7 +86,7 @@ bash launcher/build.sh    # 저장소 루트에 NaverMap.app 생성
 ### 4. 테스트 실행
 
 ```bash
-pytest -v
+uv run pytest -v
 ```
 
 > `tests/test_api.py`의 PDF 업로드 테스트는 Windows 시스템 폰트(`C:/Windows/Fonts/malgun.ttf`)를 사용합니다. macOS/Linux에서는 해당 테스트가 폰트 없이 실행되지만 통과됩니다.
@@ -99,7 +99,7 @@ pytest -v
 navermap_converter/
 ├── main.py                  # FastAPI 앱 진입점, 모든 API 라우터
 ├── models.py                # AddressItem 공유 데이터 모델
-├── requirements.txt         # Python 의존성
+├── pyproject.toml           # Python 의존성 (uv)
 ├── pytest.ini               # asyncio_mode = auto
 ├── parser/
 │   ├── text_parser.py       # 한국 주소 정규식 추출 (도로명 + 지번)

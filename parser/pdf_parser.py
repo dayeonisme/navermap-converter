@@ -1,18 +1,20 @@
 # parser/pdf_parser.py
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List
 import pdfplumber
 from models import AddressItem
 from parser.text_parser import extract_addresses, _dedup_key
 
-def _ocr_page(page) -> str:
-    """pdfplumber 페이지를 이미지로 변환 후 OCR."""
+
+def _ocr_image(pil_image) -> str:
+    """페이지 이미지 하나를 OCR (스레드에서 병렬 실행 가능 — Tesseract는 별도 프로세스)."""
     import sys
     try:
         import pytesseract
     except ImportError:
         print(
-            "[pdf_parser] OCR 불가: pytesseract 미설치. `pip install pytesseract` 후 "
+            "[pdf_parser] OCR 불가: pytesseract 미설치. `uv add pytesseract` 후 "
             "Tesseract OCR 엔진(https://github.com/tesseract-ocr/tesseract)과 "
             "한국어 데이터(kor.traineddata)를 설치하세요.",
             file=sys.stderr,
@@ -20,7 +22,6 @@ def _ocr_page(page) -> str:
         return ""
 
     try:
-        pil_image = page.to_image(resolution=300).original
         return pytesseract.image_to_string(pil_image, lang="kor+eng")
     except pytesseract.TesseractNotFoundError:
         print(
@@ -31,19 +32,31 @@ def _ocr_page(page) -> str:
         )
         return ""
 
+
 def parse_pdf(path: Path) -> List[AddressItem]:
     """PDF 파일에서 주소 추출. 텍스트 추출 실패 시 OCR 폴백."""
     items: List[AddressItem] = []
+    page_texts: List[str] = []
+    # (list 인덱스, PIL 이미지) — OCR 필요한 페이지만 모아서 스레드풀로 병렬 처리
+    ocr_targets: List[tuple[int, object]] = []
 
     with pdfplumber.open(path) as pdf:
-        for page_num, page in enumerate(pdf.pages, start=1):
-            source = f"PDF {page_num}페이지"
+        for page in pdf.pages:
             text = page.extract_text() or ""
-
+            page_texts.append(text)
             if not text.strip():
-                text = _ocr_page(page)
+                # 이미지 렌더링은 pdfplumber 문서 객체를 공유하므로 순차 실행
+                ocr_targets.append((len(page_texts) - 1, page.to_image(resolution=300).original))
 
-            items.extend(extract_addresses(text, source_prefix=source))
+    if ocr_targets:
+        with ThreadPoolExecutor(max_workers=min(4, len(ocr_targets))) as pool:
+            ocr_results = pool.map(_ocr_image, (img for _, img in ocr_targets))
+        for (idx, _), text in zip(ocr_targets, ocr_results):
+            page_texts[idx] = text
+
+    for page_num, text in enumerate(page_texts, start=1):
+        source = f"PDF {page_num}페이지"
+        items.extend(extract_addresses(text, source_prefix=source))
 
     # 페이지 간 중복 제거 (공백 차이 무시)
     seen: set[str] = set()

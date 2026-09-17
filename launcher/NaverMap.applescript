@@ -62,14 +62,14 @@ on run
 				activate
 				set newWindow to (create window with default profile)
 				tell current session of newWindow
-					write text "cd __APP_DIR__ && /usr/bin/python3 main.py"
+					write text "cd __APP_DIR__ && uv run main.py"
 				end tell
 			end tell
 			set launchedIn to "iTerm2"
 		on error
 			tell application "Terminal"
 				activate
-				do script "cd __APP_DIR__ && /usr/bin/python3 main.py"
+				do script "cd __APP_DIR__ && uv run main.py"
 			end tell
 		end try
 		delay 1

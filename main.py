@@ -75,9 +75,9 @@ async def upload_file(file: UploadFile = File(...)):
 
     try:
         if suffix == ".pdf":
-            items = parse_pdf(tmp_path)
+            items = await asyncio.to_thread(parse_pdf, tmp_path)
         else:
-            items = parse_excel(tmp_path)
+            items = await asyncio.to_thread(parse_excel, tmp_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"파싱 오류: {e}")
     finally:

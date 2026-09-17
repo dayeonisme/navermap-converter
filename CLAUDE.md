@@ -9,24 +9,24 @@ PDF·엑셀·텍스트에서 한국 주소를 추출하고 네이버 지도에 `
 ## 개발 명령어
 
 ```bash
-# 서버 실행
-python main.py                        # http://localhost:8000
+# 서버 실행 (실제로는 NaverMap.app 더블클릭 토글 사용 — python main.py 직접 실행 안 함)
+uv run main.py                        # http://localhost:8000
 
 # 테스트 전체
-pytest -v
+uv run pytest -v
 
 # 단일 파일 테스트
-pytest tests/test_text_parser.py -v
+uv run pytest tests/test_text_parser.py -v
 
 # 단일 테스트 함수
-pytest tests/test_api.py::test_parse_text_주소_반환 -v
+uv run pytest tests/test_api.py::test_parse_text_주소_반환 -v
 
-# 의존성 설치
-pip install -r requirements.txt
-playwright install chromium
+# 의존성 설치 (uv가 .venv 자동 생성)
+uv sync
+uv run playwright install chromium
 
 # 테스트용 PDF 픽스처 재생성 (필요 시)
-python tests/create_fixtures.py
+uv run tests/create_fixtures.py
 ```
 
 ## 아키텍처
